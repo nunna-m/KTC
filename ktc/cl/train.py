@@ -5,9 +5,12 @@ CLI for train command
 import os
 import yaml
 
+from ktc.utils import get, store
+from ktc import dataset
 def train(
     path_data,
-    path_store,
+    path_save,
+    filename_configs_save,
     configfilepaths,
     epochs,
     early_stop_count,
@@ -40,3 +43,15 @@ def train(
     #results = model.train() with extracted train_ds and other args like max_epochs, early_stop etc
     #store the train results in path_store_results (maybe pickle?)
     #return results?
+
+    config = get.get_config(configfilepaths)
+    store.store_configs(
+        os.path.join(path_save, filename_configs_save),
+        config = config,
+        path_save=path_save,
+        path_data=path_data,
+    )
+    ds = dataset.trainds(path_data,config)
+    
+
+    
