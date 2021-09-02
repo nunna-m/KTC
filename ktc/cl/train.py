@@ -51,7 +51,7 @@ def train(
         path_save=path_save,
         path_data=path_data,
     )
-    ds = dataset.trainds(path_data,config)
+    ds = dataset.train_dataset(path_data,config)
     
 
     

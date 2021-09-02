@@ -1,45 +1,51 @@
 '''
 abstraction for tf.data.Dataset API
 '''
-import pathlib
+import os
 import tensorflow as tf
+import numpy as np
+import glob
 
-def get_label_names(data_root):
-    label_names = sorted(item.name for item in data_root.glob('*/') if item.is_dir())
-    return label_names
+def train_dataset(
+    traindir,
+    batch_size,
+    buffer_size,
+    repeat = True,
+    modalities=('am','tm','dc','ec','pc'),
+    output_size=(224,224),
+    aug_configs=None,
+):
+    
+    dataset = load_raw(
+        traindir,
+        modalities=modalities,
+        output_size=output_size,
+    )
 
-data_root = '/home/maanvi/LAB/Datasets/kidney_tumor'
+    dataset = custom_augmentation(
+        dataset,
+        aug_configs,
+    )
 
-#Load all the file paths in the directory root
-all_image_paths = list(data_root.glob('*/*'))
-all_image_paths = [str(path) for path in all_image_paths]
+    dataset = image_label(dataset, modalities=modalities)
+    dataset = configure_dataset(
+        dataset,
+        batch_size,
+        buffer_size,
+        repeat=repeat
+    )
 
-#Gather the list of labels and create a labelmap
-label_names = sorted(item.name for item in data_root.glob('*/') if item.is_dir())
-label_to_index = dict((name, index) for index, name in enumerate(label_names))
+    return dataset
 
-#Use the label map to fetch all categorical labels
-all_image_labels = [label_to_index[pathlib.Path(path).parent.name]
-                    for path in all_image_paths]
+def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,224)):
+    return dataset
 
-path_ds = tf.data.Dataset.from_tensor_slices(all_image_paths)
-label_ds = tf.data.Dataset.from_tensor_slices(all_image_labels)
+def custom_augmentation(dataset, aug_configs):
+    return dataset 
 
-def preprocess_image(path):
-    image = tf.io.read_file(path)
-    image = tf.image.decode_image(image, channels = 3)
-    image = tf.image.resize(image, [224,224])
-    image /= 255.0 
-    return image
+def image_label(dataset, modalities=('am','tm','dc','ec','pc')):
+    return dataset
 
-image_ds = path_ds.map(preprocess_image)
-image_label_ds = tf.data.Dataset.zip((image_ds, label_ds))
+def configure_dataset(dataset, batch_size, buffer_size, repeat=False):
+    return dataset 
 
-BATCH_SIZE = 32
-ds = image_label_ds.shuffle(
-    buffer_size=len(all_image_paths),
-).repeat().batch(BATCH_SIZE)
-
-steps_per_epoch = tf.math.ceil(len(all_image_paths)/BATCH_SIZE).numpy()
-
-model.fit(ds,epochs=1,steps_per_epoch=steps_per_epoch)
