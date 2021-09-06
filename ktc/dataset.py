@@ -38,7 +38,7 @@ def train_dataset(
     return dataset
 
 def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,224)):
-    
+    dataset=None
 
     return dataset
 

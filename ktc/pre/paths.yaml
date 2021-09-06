@@ -14,3 +14,7 @@ os:
       '/kw_resources/datasets/kidney_tumor'
     after_split_path:
       '/kw_resources/datasets/kidney_tumor_trainvaltest'
+
+trainvaltest_percentages:
+  train: 0.7
+  val: 0.2
