@@ -15,8 +15,7 @@ def split(whichos, path, modalities):
         path: absolute path to configfile that has information about datapath and targetpath. Currently only supports yaml extension
         modalities: give a list of slice types from ['am','tm','dc','ec','pc']
     '''
-
-    
+        
     if isinstance(modalities, str):
         modalities = modalities.strip('"').strip('[').strip(']').split(',')
     configs = return_configs_asdict(whichos, path)
