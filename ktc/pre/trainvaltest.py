@@ -4,20 +4,20 @@ import math
 import random
 import yaml
 
-
 def split(whichos, path, modalities):
     '''
     Program to generate train val test split folders
-    Sample_command: python -m pre split --os linux --path /home/user/path_to_data_config.yaml --modalities ['dc','pc','ec']
+    Sample_command: python -m pre split --whichos linux --path /home/user/path_to_data_config.yaml --modalities ['dc','pc','ec']
 
     Args:
         whichos: linux,s windows or remote
         path: absolute path to configfile that has information about datapath and targetpath. Currently only supports yaml extension
         modalities: give a list of slice types from ['am','tm','dc','ec','pc']
     '''
-        
+
     if isinstance(modalities, str):
-        modalities = modalities.strip('"').strip('[').strip(']').split(',')
+        modalities = modalities.strip('][').replace("'","").split(',')
+    
     configs = return_configs_asdict(whichos, path)
     dataset_path = configs['os'][whichos]['data_root']
     target_path = configs['os'][whichos]['after_split_path']
@@ -53,7 +53,7 @@ def return_configs_asdict(whichos,configfilepath):
     if whichos.lower() not in ['windows','linux','remote']:
         raise NotImplementedError(f'OS {whichos} option not supported')
     if isinstance(configfilepath,str):
-        extension = os.path.splitext(configfilepath)[1][1:]
+        extension = configfilepath.split(os.sep)[-1].split('.')[-1]
         if extension=='yaml' or extension=='yml':
             pass
         else:
