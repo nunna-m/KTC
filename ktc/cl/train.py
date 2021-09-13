@@ -7,6 +7,7 @@ import yaml
 
 from ktc.utils import get, store
 from ktc import dataset
+
 def train(
     path_data,
     path_save,
@@ -44,7 +45,7 @@ def train(
     #store the train results in path_store_results (maybe pickle?)
     #return results?
 
-    config = get.get_config(configfilepaths)
+    config = get.get_configs(configfilepaths)
     store.store_configs(
         os.path.join(path_save, filename_configs_save),
         config = config,

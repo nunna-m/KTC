@@ -7,7 +7,7 @@ import json
 
 import yaml
 
-def get_config(path):
+def get_configs(path):
     if isinstance(path, str): return get_config([path])
     assert isinstance(path, (tuple, list))
     assert path
