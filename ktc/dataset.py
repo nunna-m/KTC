@@ -10,6 +10,7 @@ from functools import partial, wraps
 import cv2
 
 from tensorflow.python.framework.ops import reset_default_graph
+from ktc.utils import data as dataops
 
 def train_dataset(
     data_root,
@@ -44,10 +45,9 @@ def train_dataset(
 
     return dataset
 
-def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,224), tumor_region_only=False):
+def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,224), tumor_region_only=False, dtype=tf.float32):
     
     training_subject_paths = glob.glob(os.path.join(traindir,*'*'*2))
-    #training_image_paths = filter_modalities(training_image_paths,modalities)
     dataset = tf.data.Dataset.from_tensor_slices(training_subject_paths)
     dataset = dataset.interleave(tf.data.Dataset.list_files)
     dataset = dataset.interleave(
@@ -57,8 +57,24 @@ def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,2
             modalities=modalities,
             tumor_region_only=tumor_region_only,
         ),
+        cycle_length=dataops.count(dataset),
         num_parallel_calls=tf.data.experimental.AUTOTUNE,
     )
+
+    if output_size is not None and tumor_region_only==False: 
+        dataset = dataset.map(
+            lambda image: tf.image.crop_to_bounding_box(
+                image,
+                ((tf.shape(image)[:2] - output_size) // 2)[0],
+                ((tf.shape(image)[:2] - output_size) // 2)[1],
+                *output_size,
+            ),
+            tf.data.experimental.AUTOTUNE,
+        )
+    dataset = dataset.map(lambda x: tf.reshape(x, [*x.shape[:-1], len(modalities)]), tf.data.experimental.AUTOTUNE)
+    dataset = dataset.map(lambda x: tf.cast(x, dtype=dtype), tf.data.experimental.AUTOTUNE)
+    dataset = dataset.map(lambda x: x / 255.0, tf.data.experimental.AUTOTUNE)
+
 
     return dataset
 
@@ -85,15 +101,14 @@ def prep_combined_modalities(subject, output_size, modalities, tumor_region_only
     if isinstance(subject, str): pass
     else: raise NotImplementedError
     subject_data = parse_subject(subject, output_size, modalities=modalities, tumor_region_only=tumor_region_only)
-    slice_names = subject_data['TRA'].keys()
+    slice_names = subject_data[modalities[0]].keys()
 
     slices = tf.stack([tf.stack([subject_data[type_][slice_] for type_ in modalities], axis=-1) for slice_ in slice_names])
     return dict(
-        slices=slices,
-        category=subject_data['category'],
-        patientID=subject_data['patientID'],
-        examID=subject_data['examID'],
-        path=subject_data['path'],
+        stacked_modality_slices=slices,
+        clas=subject_data['clas'],
+        ID=subject_data['ID'],
+        subject_path=subject_data['subject_path'],
     )
 
 def parse_subject(subject_path, output_size, modalities,tumor_region_only, decoder=tf.image.decode_image):
