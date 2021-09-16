@@ -1,4 +1,4 @@
-augmentation_params.train.augment_options:
+augmentation_params.train.aug_configs:
     random_crop: False
     random_flip: True
     random_contrast: False
