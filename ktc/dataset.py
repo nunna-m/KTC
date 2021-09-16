@@ -160,7 +160,8 @@ def parse_subject(subject_path, output_size, modalities,tumor_region_only, decod
     else:
         for modality, names in gathered_modalities_paths.items():
             subject_data[modality] = {
-                os.path.splitext(name)[0]: resize(decoder(os.path.join(subject_path, modality, name))[:, :, 0], output_size)for name in names
+                #os.path.splitext(name)[0]: resize(decoder(os.path.join(subject_path, modality, name))[:, :, 0], output_size)for name in names
+                os.path.splitext(name)[0]: decoder(os.path.join(subject_path, modality, name))[:, :, 0]for name in names
             }
     
     return subject_data
