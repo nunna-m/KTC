@@ -111,7 +111,7 @@ def prep_combined_modalities(subject, output_size, modalities, tumor_region_only
         subject_path=subject_data['subject_path'],
     )
 
-def parse_subject(subject_path, output_size, modalities,tumor_region_only, decoder=tf.image.decode_image):
+def parse_subject(subject_path, output_size, modalities,tumor_region_only, decoder=tf.image.decode_image, resize=tf.image.resize):
     subject_data = {'subject_path': subject_path}
     subject_data['clas'], subject_data['ID'] = get_class_ID_subjectpath(subject_path)
     gathered_modalities_paths = {
@@ -142,6 +142,16 @@ def parse_subject(subject_path, output_size, modalities,tumor_region_only, decod
         return wrapper
     decoder = image_decoder(decoder)
 
+    def image_resizer(resize_func):
+        def wrapper(img, output_size):
+            img = img[... , tf.newaxis]
+            img = resize_func(img, output_size, antialias=True, method='bilinear')
+            img = tf.reshape(img, tf.shape(tf.squeeze(img)))
+            return img
+        return wrapper
+    resize = image_resizer(resize)
+
+
     if tumor_region_only:
         for modality, names in gathered_modalities_paths.items():
             subject_data[modality] = {
@@ -150,7 +160,7 @@ def parse_subject(subject_path, output_size, modalities,tumor_region_only, decod
     else:
         for modality, names in gathered_modalities_paths.items():
             subject_data[modality] = {
-                os.path.splitext(name)[0]: decoder(os.path.join(subject_path, modality, name))[:, :, 0] for name in names
+                os.path.splitext(name)[0]: resize(decoder(os.path.join(subject_path, modality, name))[:, :, 0], output_size)for name in names
             }
     
     return subject_data
