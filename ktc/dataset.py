@@ -23,15 +23,23 @@ def train_dataset(
     aug_configs=None,
     tumor_region_only=False,
 ):
-
-    if aug_configs is None: aug_configs = {'random_crop': {}}
+    if aug_configs is None:
+        aug_configs = {
+            'random_centralcrop':{},
+        }
     default_aug_configs = {
-        augment_random_crop: dict(output_size=output_size),
-        augment_random_flip: {},
-        augment_random_contrast: dict(target_channels=list(range(len(modalities)))),
-        augment_random_warp: {},
+        random_centralcrop_img: {
+            output_size:output_size,
+        },
+        random_horizontalflip_img: {},
+        random_verticalflip_img: {},
+        random_contrast_img:  {},
+        random_jitter_img: {},
+        random_gaussianfilter_img: {},
+        random_rotation_img: {},
+        random_shear_img: {},
+        random_warp_img: {},
     }
-
     traindir = os.path.join(data_root,'_'.join(modalities),'train')
     dataset = load_raw(
         traindir,
@@ -40,10 +48,6 @@ def train_dataset(
         tumor_region_only = tumor_region_only
     )
 
-    dataset = custom_augmentation(
-        dataset,
-        methods=parse_augment_options(aug_configs, default_aug_configs),
-    )
 
     dataset = image_label(dataset, modalities=modalities)
     dataset = configure_dataset(
@@ -222,230 +226,6 @@ def get_tumor_boundingbox(imgpath, labelpath):
     }
     return crop_info
 
-
-def custom_augmentation(dataset, methods=None):
-    if methods is None:
-        methods = {
-            augment_random_crop: {},
-            augment_random_flip: {},
-            augment_random_contrast: {},
-            augment_random_warp: {},
-        }
-    else:
-        assert isinstance(methods, dict)
-        methods = dict(map(
-            lambda conf_name, conf_value: (solve_augment_method(conf_name),conf_value),
-            methods.keys(), methods.values(),
-        ))
-    
-    for operation, config in methods.items():
-        print('Augment: applying', operation, config)
-        dataset = operation(dataset, **config)
-    return dataset 
-    
-def parse_augment_options(augs, default_augs=None):
-    if default_augs is None:
-        default_augs = {}
-    data = {}
-    for conf, value in augs.items():
-        if value is None:
-            conf = {}
-        func = globals()[f'augment_{conf}']
-        if func in default_augs:
-            new_value = default_augs[func].copy()
-            new_value.update(value)
-        data[func] = value
-    return data
-
-def solve_augment_method(method_str):
-    '''
-    check if the specified augment method exists
-    and if it's really an augment method.
-    '''
-    if callable(method_str): return method_str
-    method_str.startswith('augment_')
-    method = vars[method_str]
-    return method
-
-
-def augment_random_contrast(ds, target_channels, lower=0.8, upper=1.2):
-    ds = ds.map(
-        lambda image: random_contrast(image, lower=lower, upper=upper, target_channels=target_channels),
-        num_parallel_calls=tf.data.experimental.AUTOTUNE,
-    )
-    return ds
-
-
-def random_contrast(image, lower, upper, target_channels):
-    non_target_channels = [i for i in range(image.shape[-1]) if i not in target_channels]
-
-    target = tf.gather(image, target_channels, axis=2)
-    non_target = tf.gather(image, non_target_channels, axis=2)
-    target_out = tf.image.random_contrast(target, lower=lower, upper=upper)
-    image = tf.concat([target_out, non_target], axis=2)
-    indices = list(map(
-        lambda xy: xy[1],
-        sorted(
-            zip(target_channels + non_target_channels, range(1000)),
-            key=lambda xy: xy[0],
-        ),
-    ))
-    image = tf.gather(image, indices, axis=2)
-    return image
-
-
-def augment_random_hue(ds, max_delta=0.2):
-    ds = ds.map(
-        lambda image: tf.image.random_hue(image, max_delta=max_delta),
-        num_parallel_calls=tf.data.experimental.AUTOTUNE,
-    )
-    return ds
-
-
-def augment_random_flip(ds):
-    ds = ds.map(
-        tf.image.random_flip_left_right,
-        num_parallel_calls=tf.data.experimental.AUTOTUNE,
-    )
-    return ds
-
-
-def augment_random_warp(ds: tf.data.Dataset, process_in_batch=10, **options) -> tf.data.Dataset:
-    '''apply augmentation based on image warping
-
-    Args:
-        process_in_batch: the number of images to apply warping in a batch
-            None to disable this feature
-        options: options to be passed to random_warp function
-    '''
-    if process_in_batch is not None:
-        ds = ds.batch(process_in_batch)
-    ds = ds.map(
-        lambda image: random_warp(image, process_in_batch=process_in_batch, **options),
-        num_parallel_calls=tf.data.experimental.AUTOTUNE,
-    )
-    if process_in_batch is not None:
-        ds = ds.unbatch()
-    return ds
-
-
-def augment_random_crop(ds, **options):
-    '''apply augmentation based on image warping'''
-    ds = ds.map(
-        lambda image: random_crop(image, **options),
-        num_parallel_calls=tf.data.experimental.AUTOTUNE,
-    )
-    return ds
-
-
-def augment_random_intrachannelwarp(ds: tf.data.Dataset, paired=((0, -1),), **options) -> tf.data.Dataset:
-    '''warps each channel indenpently.
-
-    As oppposed to `augment_random_warp`, this will introduce misalignments between
-    channels. For this reason, this function is not intended to used as a regular training,
-    rather for experiment purpose to see how a model robust against misalignments between slices.
-
-    Args:
-        paired (list[tuple[int, int]]): list of paired channels. Paired channels will be applied
-            warping operation together, keeping them consistent.
-            This is meant to be used to align a channel to a label, while still introducing
-            artificial misalignments between channels.
-        options: options to be passed to random_warp function
-    '''
-    ds = ds.map(
-        lambda image: random_intrachannelwarp(image, paired=paired, **options),
-        num_parallel_calls=tf.data.experimental.AUTOTUNE,
-    )
-    return ds
-
-
-def random_crop(image, output_size=(512, 512), stddev=4, max_=6, min_=-6):
-    """
-    performs augmentation by cropping/resizing
-    given image
-    """
-    diff = tf.clip_by_value(tf.cast(tf.random.normal([2], stddev=stddev), tf.int32), min_, max_)
-    image = tf.image.crop_to_bounding_box(
-        image,
-        ((tf.shape(image)[:2] - output_size) // 2 + diff)[0],
-        ((tf.shape(image)[:2] - output_size) // 2 + diff)[1],
-        *output_size,
-    )
-    return image
-
-
-def random_intrachannelwarp(image, n_points=100, max_diff=5, stddev=2.0, paired=()):
-    paired = list(map(
-        lambda channel_list: list(map(
-            lambda channel: channel if channel >= 0 else image.get_shape()[-1] + channel,
-            channel_list,
-        )),
-        paired,
-    ))
-    non_paired = list(map(
-        lambda x: [x],
-        set(range(image.get_shape()[-1])) - set([index for indices in paired for index in indices]),
-    ))
-    channel_groups = paired + non_paired
-    warped_groups = list(map(
-        lambda group: random_warp(tf.gather(image, group, axis=-1), n_points=100, max_diff=max_diff, stddev=stddev),
-        channel_groups,
-    ))
-    warped_groups = [channel for channels in warped_groups for channel in tf.unstack(channels, axis=-1)]
-    indices = [index for indices in channel_groups for index in indices]
-    image = tf.stack(
-        list(map(lambda x: x[1], sorted(zip(indices, warped_groups), key=lambda x: x[0]))),
-        axis=-1
-    )
-    return image
-
-
-@tf.function
-def random_warp(image, n_points=100, max_diff=5, stddev=2.0, process_in_batch=None):
-    '''
-    this function will perfom data augmentation
-    using Non-affine transformation, namely
-    image warping.
-    Currently, only square images are supported
-
-    Args:
-        image: input image
-        n_points: the num of points to take for image warping
-        max_diff: maximum movement of pixels
-    Return:
-        warped image
-    '''
-    if process_in_batch is not None:
-        width_index, height_index, n_images = 1, 2, process_in_batch
-        image = tf.reshape(image, [n_images, *image.get_shape()[1:]])
-    else:
-        width_index, height_index, n_images = 0, 1, 1
-
-    width = tf.shape(image)[width_index]
-    height = tf.shape(image)[height_index]
-
-    with tf.control_dependencies([tf.assert_equal(width, height)]):
-        raw = tf.random.uniform([n_images, n_points, 2], 0.0, tf.cast(width, tf.float32), dtype=tf.float32)
-        diff = tf.random.normal([n_images, n_points, 2], mean=0.0, stddev=stddev, dtype=tf.float32)
-        # ensure that diff is not too big
-        diff = tf.clip_by_value(diff, tf.cast(-max_diff, tf.float32), tf.cast(max_diff, tf.float32))
-
-    if process_in_batch is None:
-        # expand dimension to meet the requirement of sparse_image_warp
-        image = tf.expand_dims(image, 0)
-
-    image = tfa.image.sparse_image_warp(
-        image=image,
-        source_control_point_locations=raw,
-        dest_control_point_locations=raw + diff,
-    )[0]
-    # sparse_image_warp function will return a tuple
-    # (warped image, flow_field)
-
-    if process_in_batch is None:
-        # shrink dimension
-        image = image[0, :, :, :]
-    return image
 
 def image_label(dataset, modalities=('am','tm','dc','ec','pc')):
     return dataset

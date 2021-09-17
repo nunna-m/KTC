@@ -1,9 +1,10 @@
-trainevaltest_data_params:
+data_options:
     train:
         batch_size: 8
         buffer_size: 1024
         output_size: [224, 224]
-        slice_types: ['am','tm']
+        slice_types: ['am','tm','dc','ec','pc']
+        tumor_region_only: False
         aug_configs:
             random_crop:
             random_flip:
@@ -12,4 +13,5 @@ trainevaltest_data_params:
     eval:
         batch_size: 64
         output_size: [224, 224]
-        slice_types: ['am','tm']
+        slice_types: ['am','tm','dc','ec','pc']
+        tumor_region_only: False

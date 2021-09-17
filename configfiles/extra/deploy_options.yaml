@@ -1,4 +1,4 @@
-model_params:
+deploy_options:
     optimizer: adam
     LearningRateScheduler: "lambda epoch, current_lr: 0.001 * 0.96 ** (epoch // 1000)"
     loss:
