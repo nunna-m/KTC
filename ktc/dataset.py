@@ -1,8 +1,8 @@
 '''
 abstraction for tf.data.Dataset API
 '''
+from ktc.utils import data
 import os
-from numpy.lib.type_check import _nan_to_num_dispatcher
 import tensorflow as tf
 import numpy as np
 import glob
@@ -10,8 +10,9 @@ from functools import partial, wraps
 import cv2
 import tensorflow_addons as tfa
 
-from tensorflow.python.framework.ops import reset_default_graph
-from ktc.utils import data as dataops
+
+AUTOTUNE = tf.data.experimental.AUTOTUNE
+
 
 def train_dataset(
     data_root,
@@ -25,20 +26,20 @@ def train_dataset(
 ):
     if aug_configs is None:
         aug_configs = {
-            'random_centralcrop':{},
+            'random_crop':{},
         }
     default_aug_configs = {
-        random_centralcrop_img: {
+        random_crop_img: {
             output_size:output_size,
         },
         random_horizontalflip_img: {},
         random_verticalflip_img: {},
-        random_contrast_img:  {},
-        random_jitter_img: {},
-        random_gaussianfilter_img: {},
+        random_contrast_img:  dict(channels=list(range(len(modalities)))),
+        random_brightness_img: {},
+        random_hue_img: {},
+        random_saturation_img: {},
         random_rotation_img: {},
         random_shear_img: {},
-        random_warp_img: {},
     }
     traindir = os.path.join(data_root,'_'.join(modalities),'train')
     dataset = load_raw(
@@ -48,6 +49,11 @@ def train_dataset(
         tumor_region_only = tumor_region_only
     )
 
+    dataset = augmentation(
+        dataset,
+        methods=parse_aug_configs(aug_configs,
+                                    default_aug_configs),
+    )
 
     dataset = image_label(dataset, modalities=modalities)
     dataset = configure_dataset(
@@ -71,7 +77,7 @@ def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,2
             modalities=modalities,
             tumor_region_only=tumor_region_only,
         ),
-        cycle_length=dataops.count(dataset),
+        cycle_length=data.count(dataset),
         num_parallel_calls=tf.data.experimental.AUTOTUNE,
     )
 
@@ -85,9 +91,9 @@ def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,2
             ),
             tf.data.experimental.AUTOTUNE,
         )
-    dataset = dataset.map(lambda x: tf.reshape(x, [*x.shape[:-1], len(modalities)]), tf.data.experimental.AUTOTUNE)
-    dataset = dataset.map(lambda x: tf.cast(x, dtype=dtype), tf.data.experimental.AUTOTUNE)
-    dataset = dataset.map(lambda x: x / 255.0, tf.data.experimental.AUTOTUNE)
+    dataset = dataset.map(lambda x: tf.reshape(x, [*x.shape[:-1], len(modalities)]), AUTOTUNE)
+    dataset = dataset.map(lambda x: tf.cast(x, dtype=dtype), AUTOTUNE)
+    dataset = dataset.map(lambda x: x / 255.0, AUTOTUNE)
 
 
     return dataset
@@ -226,6 +232,160 @@ def get_tumor_boundingbox(imgpath, labelpath):
     }
     return crop_info
 
+def parse_aug_configs(configs, default_configs=None):
+    if default_configs is None:
+        default_configs = {}
+    updated_conf = {}
+    for name, conf in configs.items():
+        if conf is None: conf = {}
+        func = globals()[f'{name}_img']
+        if func in default_configs:
+            new_conf = default_configs[func].copy()
+            new_conf.update(conf)
+            conf = new_conf
+        updated_conf[func] = conf
+    return updated_conf    
+    
+def augmentation(dataset, methods=None):
+    if methods is None:
+        methods = {
+        random_crop_img: {},
+        random_horizontalflip_img: {},
+        random_verticalflip_img: {},
+        random_contrast_img:  {},
+        random_brightness_img: {},
+        random_hue_img: {},
+        random_saturation_img: {},
+        random_rotation_img: {},
+        random_shear_img: {},
+        }
+    else:
+        assert isinstance(methods, dict)
+        method = dict(map(
+            lambda name, config: (augmentation_method(name),config),
+            methods.keys(), methods.values()
+        ))
+
+    for operation, config in methods.items():
+        print('Applying augmentation: ', operation, config)
+        dataset = operation(dataset, **config)
+    
+    return dataset
+
+def augmentation_method(method_in_str):
+    if callable(method_in_str): return method_in_str
+    method_in_str.endswith('_img')
+    method = vars[method_in_str]
+    return method
+
+def random_crop_img(dataset, **configs):
+    dataset = dataset.map(
+        lambda image: random_crop(image, **configs),
+        num_parallel_calls=AUTOTUNE,
+    )
+    return dataset
+
+def random_crop(img, output_size=(224,224), stddev=4, max_=6, min_=-6):
+    threshold = tf.clip_by_value(tf.cast(tf.random.normal([2],stddev=stddev), tf.int32), min_, max_)
+    diff = (tf.shape(img)[:2] - output_size) // 2 + threshold
+    img = tf.image.crop_to_bounding_box(
+        img,
+        diff[0],
+        diff[1],
+        *output_size,
+    )
+    return img
+
+def random_horizontalflip_img(dataset):
+    dataset = dataset.map(
+        tf.image.random_flip_left_right,
+        num_parallel_calls=AUTOTUNE,
+    )
+    return dataset
+
+def random_verticalflip_img(dataset):
+    dataset = dataset.map(
+        tf.image.random_flip_up_down,
+        num_parallel_calls=AUTOTUNE,
+    )
+    return dataset
+
+def random_contrast_img(dataset, channels, lower=0.8, upper=1.2):
+    dataset = dataset.map(
+        lambda image: random_contrast(image, lower=lower, upper=upper, channels=channels),
+        num_parallel_calls=AUTOTUNE,
+    )
+    return dataset
+
+def random_contrast(img, lower, upper, channels):
+    skip_channels = [i for i in range(img.shape[-1]) if i not in channels]
+
+    picked_channels_img = tf.gather(img, channels, axis=2)
+    skipped_channels_img = tf.gather(img, skip_channels, axis=2)
+    final_img = tf.image.random_contrast(picked_channels_img, lower=lower, upper=upper)
+    img = tf.concat([final_img, skipped_channels_img], axis=2)
+    indices = list(map(
+        lambda CW: CW[1],
+        sorted(zip(channels+skip_channels, range(1000)),
+        key=lambda CW:CW[0],
+                ),
+    ))
+    img = tf.gather(img, indices, axis=2)
+    return img
+
+def random_brightness_img(dataset, max_delta=0.2):
+    dataset = dataset.map(
+        lambda img: tf.image.random_brightness(img,
+        max_delta=max_delta),
+        num_parallel_calls=AUTOTUNE,
+    )
+    return dataset
+
+def random_saturation_img(dataset, lower=5, upper=10):
+    if dataset[0].shape[-1] < 3:
+        return dataset
+    dataset = dataset.map(
+        lambda img: tf.image.random_saturation(img,
+        lower=lower, upper=upper),
+        num_parallel_calls=AUTOTUNE,
+    )
+    return dataset
+
+def random_hue_img(dataset, max_delta=0.2):
+    if dataset[0].shape[-1] < 3:
+        return dataset
+    dataset = dataset.map(
+        lambda img: tf.image.random_hue(img, max_delta=max_delta),
+        num_parallel_calls=AUTOTUNE,
+    )
+    return dataset
+
+def random_rotation_img(dataset):
+    dataset = dataset.map(
+        lambda img: random_rotation(img),
+        num_parallel_calls=AUTOTUNE,
+    )
+    return dataset
+
+def random_rotation(img, angle_range=(-5,5),interpolation='bilinear',fill_mode='nearest'):
+    angle = tf.random.uniform(shape=[1], minval=angle_range[0], maxval=angle_range[1])
+    img = tfa.image.rotate(img, angle=angle,
+    interpolation=interpolation,
+    fill_mode=fill_mode)
+    return img
+
+def random_shear_img(dataset, x=(-10,10), y=(-10,10)):
+    x_axis = tf.random.uniform(shape=[1], minval=y[0], maxval=y[1])
+    y_axis = tf.random.uniform(shape=[1], minval=x[0], maxval=x[1])
+    dataset = dataset.map(
+        lambda img: tfa.image.shear_x(img, y_axis, [1]),
+        num_paralell_calls=AUTOTUNE,
+    )
+    dataset = dataset.map(
+        lambda img: tfa.image.shear_y(img, x_axis, [1]),
+        num_paralell_calls=AUTOTUNE,
+    )
+    return dataset
 
 def image_label(dataset, modalities=('am','tm','dc','ec','pc')):
     return dataset
