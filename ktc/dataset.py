@@ -112,7 +112,7 @@ def combine_modalities(subject, output_size, modalities=('am','tm','dc','ec','pc
     return tf.py_function(
         lambda x: partial(prep_combined_modalities,
         output_size,
-        modalities=modalities, tumor_region_only=tumor_region_only)(x)['modalities'],
+        modalities=modalities, tumor_region_only=tumor_region_only)(x)['stacked_modality_slices'],
         [subject],
         tf.uint8,
     )
@@ -388,6 +388,11 @@ def random_shear_img(dataset, x=(-10,10), y=(-10,10)):
     return dataset
 
 def image_label(dataset, modalities=('am','tm','dc','ec','pc')):
+    feature_indices = [i for i in range(len(modalities))]
+    clas_index = len(modalities)
+    
+    def convert(data):
+        data.update({'x':data, 'y':})
     return dataset
 
 def configure_dataset(dataset, batch_size, buffer_size, repeat=False):
