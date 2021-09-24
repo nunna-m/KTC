@@ -392,7 +392,7 @@ def image_label(dataset, modalities=('am','tm','dc','ec','pc')):
     clas_index = len(modalities)
     
     def convert(data):
-        data.update({'x':data, 'y':})
+        data.update({'x':data, 'y':clas_index})
     return dataset
 
 def configure_dataset(dataset, batch_size, buffer_size, repeat=False):

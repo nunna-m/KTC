@@ -8,6 +8,144 @@ import cv2
 from tensorflow.python.framework.ops import reset_default_graph
 from tensorflow.python.ops.gen_array_ops import shape
 
+import os
+import tensorflow as tf
+import numpy as np
+import glob
+from functools import partial, wraps
+import cv2
+import tensorflow_addons as tfa
+
+
+AUTOTUNE = tf.data.experimental.AUTOTUNE
+
+def count(ds):
+    size = 0
+    for i in ds: 
+        size += 1
+    return size
+
+def train_dataset(
+    data_root,
+    batch_size,
+    buffer_size,
+    repeat = True,
+    modalities=('am','tm','dc','ec','pc'),
+    output_size=(224,224),
+    aug_configs=None,
+    tumor_region_only=False,
+):
+    if aug_configs is None:
+        aug_configs = {
+            'random_crop':{},
+        }
+    default_aug_configs = {
+        random_crop_img: dict(output_size=output_size),
+        random_horizontalflip_img: {},
+    }
+    
+    traindir = os.path.join(data_root,'_'.join(modalities),'train')
+    dataset = load_raw(
+        traindir,
+        modalities=modalities,
+        output_size=output_size,
+        tumor_region_only = tumor_region_only
+    )
+
+    dataset = augmentation(
+        dataset,
+        methods=parse_aug_configs(aug_configs,
+                                    default_aug_configs),
+    )
+    len_of_dataset = tf.data.experimental.cardinality(dataset)
+    dataset = image_label(dataset, modalities, len_of_dataset)
+    dataset = configure_dataset(
+        dataset,
+        batch_size,
+        buffer_size,
+        repeat=repeat
+    )
+
+    return dataset
+
+def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,224), tumor_region_only=False, dtype=tf.float32):
+    
+    training_subject_paths = glob.glob(os.path.join(traindir,*'*'*2))
+    dataset = tf.data.Dataset.from_tensor_slices(training_subject_paths)
+    dataset = dataset.interleave(tf.data.Dataset.list_files)
+    dataset = dataset.interleave(
+        partial(
+            combine_modalities,
+            output_size=output_size,
+            modalities=modalities,
+            tumor_region_only=tumor_region_only,
+            return_type='dataset',
+        ),
+        cycle_length=count(dataset),
+        num_parallel_calls=AUTOTUNE,
+    )
+
+    if output_size is not None and tumor_region_only==False: 
+        dataset = dataset.map(
+            lambda image: tf.image.crop_to_bounding_box(
+                image,
+                ((tf.shape(image)[:2] - output_size) // 2)[0],
+                ((tf.shape(image)[:2] - output_size) // 2)[1],
+                *output_size,
+            ),
+            tf.data.experimental.AUTOTUNE,
+        )
+    dataset = dataset.map(lambda x: tf.reshape(x, [*x.shape[:-1], len(modalities)]), AUTOTUNE)
+    dataset = dataset.map(lambda x: tf.cast(x, dtype=dtype), AUTOTUNE)
+    dataset = dataset.map(lambda x: x / 255.0, AUTOTUNE)
+
+
+    return dataset
+
+def combine_modalities(subject, output_size, modalities, tumor_region_only,return_type='array'):
+    
+    # return tf.py_function(
+    #     lambda x: partial(prep_combined_modalities,
+    #     output_size,
+    #     modalities=modalities, tumor_region_only=tumor_region_only)(x)['stacked_modality_slices'],
+    #     [subject],
+    #     tf.uint8,
+    # )
+
+    return_type = return_type.lower()
+    if return_type == 'array':
+        return tf.py_function(
+            lambda x: partial(prep_combined_modalities,
+            output_size,
+            modalities=modalities, tumor_region_only=tumor_region_only)(x)['stacked_modality_slices'],
+            [subject],
+            tf.uint8,
+        )
+    elif return_type == 'dataset':
+        return tf.data.Dataset.from_tensor_slices(
+            combine_modalities(subject, output_size,
+            modalities=modalities, tumor_region_only=tumor_region_only, return_type='array')
+        )
+    elif return_type == 'infinite_dataset':
+        return combine_modalities(subject, output_size,
+            modalities=modalities, tumor_region_only=tumor_region_only, return_type='dataset').repeat(None)
+    else: raise NotImplementedError
+
+
+def prep_combined_modalities(subject, output_size, modalities, tumor_region_only):
+    if isinstance(subject, str): pass
+    else: raise NotImplementedError
+    subject_data = parse_subject(subject, output_size, modalities=modalities, tumor_region_only=tumor_region_only)
+    slice_names = subject_data[modalities[0]].keys()
+
+    slices = tf.stack([tf.stack([subject_data[type_][slice_] for type_ in modalities], axis=-1) for slice_ in slice_names])
+    return dict(
+        stacked_modality_slices=slices,
+        clas=subject_data['clas'],
+        ID=subject_data['ID'],
+        subject_path=subject_data['subject_path'],
+    )
+
 
 def parse_subject(subject_path, output_size, modalities,tumor_region_only, decoder=tf.image.decode_image, resize=tf.image.resize):
     subject_data = {'subject_path': subject_path}
@@ -109,10 +247,92 @@ def get_tumor_boundingbox(imgpath, labelpath):
     }
     return crop_info
 
-subject_data = parse_subject(subject_path='/home/maanvi/LAB/Datasets/kidney_tumor_trainvaltest/am_tm/train/AML/87345564', output_size = (224,224), modalities=['am','tm'], tumor_region_only=False)
+def parse_aug_configs(configs, default_configs=None):
+    if default_configs is None:
+        default_configs = {}
+    updated_conf = {}
+    for name, conf in configs.items():
+        if conf is None: conf = {}
+        func = globals()[f'{name}_img']
+        if func in default_configs:
+            new_conf = default_configs[func].copy()
+            new_conf.update(conf)
+            conf = new_conf
+        updated_conf[func] = conf
+    return updated_conf    
+    
+def augmentation(dataset, methods=None):
+    if methods is None:
+        methods = {
+        random_crop_img: {},
+        random_horizontalflip_img: {},
+        }
+    else:
+        assert isinstance(methods, dict)
+        method = dict(map(
+            lambda name, config: (augmentation_method(name),config),
+            methods.keys(), methods.values()
+        ))
 
-print(subject_data)
+    for operation, config in methods.items():
+        print('Applying augmentation: ', operation, config)
+        dataset = operation(dataset, **config)
+    
+    return dataset
 
+def augmentation_method(method_in_str):
+    if callable(method_in_str): return method_in_str
+    method_in_str.endswith('_img')
+    method = vars[method_in_str]
+    return method
+
+def random_crop_img(dataset, **configs):
+    dataset = dataset.map(
+        lambda image: random_crop(image, **configs),
+        num_parallel_calls=AUTOTUNE,
+    )
+    return dataset
+
+def random_crop(img, output_size=(224,224), stddev=4, max_=6, min_=-6):
+    threshold = tf.clip_by_value(tf.cast(tf.random.normal([2],stddev=stddev), tf.int32), min_, max_)
+    diff = (tf.shape(img)[:2] - output_size) // 2 + threshold
+    img = tf.image.crop_to_bounding_box(
+        img,
+        diff[0],
+        diff[1],
+        *output_size,
+    )
+    return img
+
+def random_horizontalflip_img(dataset):
+    dataset = dataset.map(
+        tf.image.random_flip_left_right,
+        num_parallel_calls=AUTOTUNE,
+    )
+    return dataset
+
+def image_label(dataset, modalities, lendata):
+    slice_indices = [i for i in range(len(modalities))]
+    def convert(data):
+        combined_slices = data
+        feature = tf.gather(combined_slices, slice_indices, axis=-1)
+        label = 0
+        return feature, label
+    dataset = dataset.map(convert, AUTOTUNE)
+    return dataset
+
+def configure_dataset(dataset, batch_size, buffer_size, repeat=False):
+    dataset = dataset.shuffle(buffer_size)
+    if repeat:
+        dataset = dataset.repeat(None)
+    dataset = dataset.batch(batch_size)
+    dataset = dataset.prefetch(AUTOTUNE)
+    return dataset
+
+final_dataset = train_dataset(data_root='/home/maanvi/LAB/Datasets/sample_kt',batch_size=4,buffer_size=10,repeat=True,modalities=('am','tm'),output_size=(224,224),aug_configs=None,tumor_region_only=False)
+
+for item in final_dataset.take(4):
+    print(item)
 
 # backup = img.numpy()
 # print("backup shape: ",backup.shape)
@@ -149,3 +369,7 @@ print(subject_data)
 
 #cv2.imwrite(os.path.splitext(crop_dict['labelpath'])[0]+'cropped_resized_zoomout.png', img)
 #cv2.imwrite(os.path.splitext(crop_dict['labelpath'])[0]+'cropped_resized.png', img)
+
+# subject_data = parse_subject(subject_path='/home/maanvi/LAB/Datasets/kidney_tumor_trainvaltest/am_tm/train/AML/87345564', output_size = (224,224), modalities=['am','tm'], tumor_region_only=False)
+
+# print(subject_data)
