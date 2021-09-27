@@ -15,6 +15,7 @@ import glob
 from functools import partial, wraps
 import cv2
 import tensorflow_addons as tfa
+import tensorflow_datasets as tfds
 
 
 AUTOTUNE = tf.data.experimental.AUTOTUNE
@@ -65,14 +66,14 @@ def train_dataset(
         buffer_size,
         repeat=repeat
     )
-
+    print("Dataset: ",dataset)
     return dataset
 
 def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,224), tumor_region_only=False, dtype=tf.float32):
     
     training_subject_paths = glob.glob(os.path.join(traindir,*'*'*2))
     dataset = tf.data.Dataset.from_tensor_slices(training_subject_paths)
-    dataset = dataset.interleave(tf.data.Dataset.list_files)
+    #dataset = dataset.interleave(tf.data.Dataset.list_files)
     dataset = dataset.interleave(
         partial(
             combine_modalities,
@@ -93,12 +94,16 @@ def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,2
                 ((tf.shape(image)[:2] - output_size) // 2)[1],
                 *output_size,
             ),
-            tf.data.experimental.AUTOTUNE,
+            AUTOTUNE,
         )
+    
     dataset = dataset.map(lambda x: tf.reshape(x, [*x.shape[:-1], len(modalities)]), AUTOTUNE)
+    
+    # for item in dataset.take(1):
+    #     print(item)
+    
     dataset = dataset.map(lambda x: tf.cast(x, dtype=dtype), AUTOTUNE)
     dataset = dataset.map(lambda x: x / 255.0, AUTOTUNE)
-
 
     return dataset
 
@@ -116,7 +121,7 @@ def combine_modalities(subject, output_size, modalities, tumor_region_only,retur
     if return_type == 'array':
         return tf.py_function(
             lambda x: partial(prep_combined_modalities,
-            output_size,
+            output_size=output_size,
             modalities=modalities, tumor_region_only=tumor_region_only)(x)['stacked_modality_slices'],
             [subject],
             tf.uint8,
@@ -134,11 +139,13 @@ def combine_modalities(subject, output_size, modalities, tumor_region_only,retur
 
 def prep_combined_modalities(subject, output_size, modalities, tumor_region_only):
     if isinstance(subject, str): pass
+    elif isinstance(subject, tf.Tensor): subject = subject.numpy().decode()
     else: raise NotImplementedError
     subject_data = parse_subject(subject, output_size, modalities=modalities, tumor_region_only=tumor_region_only)
     slice_names = subject_data[modalities[0]].keys()
 
     slices = tf.stack([tf.stack([subject_data[type_][slice_] for type_ in modalities], axis=-1) for slice_ in slice_names])
+    print("returning prep combine modalities")
     return dict(
         stacked_modality_slices=slices,
         clas=subject_data['clas'],
@@ -183,6 +190,8 @@ def parse_subject(subject_path, output_size, modalities,tumor_region_only, decod
             img = img[... , tf.newaxis]
             img = resize_func(img, output_size, antialias=True, method='bilinear')
             img = tf.reshape(img, tf.shape(tf.squeeze(img)))
+            #img = tf.cast(img, dtype=tf.uint8)
+            #print("img: ",img)
             return img
         return wrapper
     resize = image_resizer(resize)
@@ -194,11 +203,12 @@ def parse_subject(subject_path, output_size, modalities,tumor_region_only, decod
                 os.path.splitext(name)[0]: crop(decoder(os.path.join(subject_path, modality, name))[:, :, 2] ,output_size, get_tumor_boundingbox(os.path.join(subject_path, modality, name),os.path.join(subject_path, modality+'L', name))) for name in names
             } 
     else:
+        print("entered_tumor_region_false_else_block")
         for modality, names in gathered_modalities_paths.items():
             subject_data[modality] = {
                 os.path.splitext(name)[0]: resize(decoder(os.path.join(subject_path, modality, name))[:, :, 0], output_size)for name in names
             }
-    
+        print("else done")
     return subject_data
 
 def get_class_ID_subjectpath(subject):
@@ -225,6 +235,7 @@ def crop(img, resize_shape, crop_dict):
         assert i>0, f'height or width going out of bounds'
     
     img = tf.convert_to_tensor(img, dtype=tf.uint8)
+    #tf.cast(img, dtype=)
     return img
 
 def get_tumor_boundingbox(imgpath, labelpath):
@@ -316,7 +327,7 @@ def image_label(dataset, modalities, lendata):
     def convert(data):
         combined_slices = data
         feature = tf.gather(combined_slices, slice_indices, axis=-1)
-        label = 0
+        label = 0.0
         return feature, label
     dataset = dataset.map(convert, AUTOTUNE)
     return dataset
@@ -331,8 +342,13 @@ def configure_dataset(dataset, batch_size, buffer_size, repeat=False):
 
 final_dataset = train_dataset(data_root='/home/maanvi/LAB/Datasets/sample_kt',batch_size=4,buffer_size=10,repeat=True,modalities=('am','tm'),output_size=(224,224),aug_configs=None,tumor_region_only=False)
 
-for item in final_dataset.take(4):
-    print(item)
+print("done generating dataset")
+for item in final_dataset.take(1):
+    print(item.numpy())
+# prep = tf.data.experimental.get_single_element(final_dataset)
+
+# print("prep: ",prep)
+
 
 # backup = img.numpy()
 # print("backup shape: ",backup.shape)
