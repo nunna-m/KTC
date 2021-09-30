@@ -1,23 +1,12 @@
 import os
-from numpy.lib.type_check import _nan_to_num_dispatcher
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
+
 import tensorflow as tf
 import numpy as np
 import glob
-from functools import partial, wraps
+from functools import partial
 import cv2
-from tensorflow.python.framework.ops import reset_default_graph
-from tensorflow.python.ops.gen_array_ops import shape
-
-import os
-import tensorflow as tf
-import numpy as np
-import glob
-from functools import partial, wraps
-import cv2
-import tensorflow_addons as tfa
-import tensorflow_datasets as tfds
-
-
+import sys
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 
 def count(ds):
@@ -52,7 +41,6 @@ def train_dataset(
         output_size=output_size,
         tumor_region_only = tumor_region_only
     )
-
     dataset = augmentation(
         dataset,
         methods=parse_aug_configs(aug_configs,
@@ -73,7 +61,7 @@ def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,2
     
     training_subject_paths = glob.glob(os.path.join(traindir,*'*'*2))
     dataset = tf.data.Dataset.from_tensor_slices(training_subject_paths)
-    #dataset = dataset.interleave(tf.data.Dataset.list_files)
+    dataset = dataset.interleave(tf.data.Dataset.list_files)
     dataset = dataset.interleave(
         partial(
             combine_modalities,
@@ -85,7 +73,6 @@ def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,2
         cycle_length=count(dataset),
         num_parallel_calls=AUTOTUNE,
     )
-
     if output_size is not None and tumor_region_only==False: 
         dataset = dataset.map(
             lambda image: tf.image.crop_to_bounding_box(
@@ -138,6 +125,7 @@ def combine_modalities(subject, output_size, modalities, tumor_region_only,retur
 
 
 def prep_combined_modalities(subject, output_size, modalities, tumor_region_only):
+    #tf.print("entered prep_combined_modalities function")
     if isinstance(subject, str): pass
     elif isinstance(subject, tf.Tensor): subject = subject.numpy().decode()
     else: raise NotImplementedError
@@ -145,7 +133,8 @@ def prep_combined_modalities(subject, output_size, modalities, tumor_region_only
     slice_names = subject_data[modalities[0]].keys()
 
     slices = tf.stack([tf.stack([subject_data[type_][slice_] for type_ in modalities], axis=-1) for slice_ in slice_names])
-    print("returning prep combine modalities")
+    tf.print(slices,output_stream=sys.stdout)
+    #tf.print(" exiting prep combine modalities")
     return dict(
         stacked_modality_slices=slices,
         clas=subject_data['clas'],
@@ -343,8 +332,8 @@ def configure_dataset(dataset, batch_size, buffer_size, repeat=False):
 final_dataset = train_dataset(data_root='/home/maanvi/LAB/Datasets/sample_kt',batch_size=4,buffer_size=10,repeat=True,modalities=('am','tm'),output_size=(224,224),aug_configs=None,tumor_region_only=False)
 
 print("done generating dataset")
-for item in final_dataset.take(1):
-    print(item.numpy())
+# for item in final_dataset.take(1):
+#     print(item.numpy())
 # prep = tf.data.experimental.get_single_element(final_dataset)
 
 # print("prep: ",prep)
