@@ -27,10 +27,15 @@ def prep_combined_modalities(subject, output_size, modalities, tumor_region_only
     
     temp_slices = [tf.stack([subject_data[type_][slice_] for type_ in modalities], axis=-1) for slice_ in slice_names]
     print(clas_tensor)
-    slices = tf.stack([
-        tf.tensor_scatter_nd_add(clas_tensor, indices=tf.constant([[224,224,0],[224,224,1]]),
-                        updates = tf.constant(temp_slices[i])) for i in range(4)
-    ])
+    indices = tf.constant([[2]])
+
+    slices = [
+        tf.tensor_scatter_nd_add(
+            clas_tensor,
+            indices=indices,
+            updates=temp_slices[i],
+            ) for i in range(4)
+    ]
 
     # slices = tf.stack([clas_tensor], axis=-1)
     # slices = tf.stack(
