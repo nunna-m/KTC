@@ -54,7 +54,6 @@ def train_dataset(
         buffer_size,
         repeat=repeat
     )
-    print("Dataset: ",dataset)
     return dataset
 
 def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,224), tumor_region_only=False, dtype=tf.float32):
@@ -131,10 +130,15 @@ def prep_combined_modalities(subject, output_size, modalities, tumor_region_only
     else: raise NotImplementedError
     subject_data = parse_subject(subject, output_size, modalities=modalities, tumor_region_only=tumor_region_only)
     slice_names = subject_data[modalities[0]].keys()
-
+    if subject_data['clas']=='AML':
+        clas_tensor = tf.zeros(output_size,dtype=tf.int8)
+    elif subject_data['clas']=='CCRCC':
+        clas_tensor = tf.ones(output_size,dtype=tf.int8)
+    else:
+        raise NotImplementedError
+    
     slices = tf.stack([tf.stack([subject_data[type_][slice_] for type_ in modalities], axis=-1) for slice_ in slice_names])
-    tf.print(slices,output_stream=sys.stdout)
-    #tf.print(" exiting prep combine modalities")
+    slices = tf.stack([slices,clas_tensor],axis=0)
     return dict(
         stacked_modality_slices=slices,
         clas=subject_data['clas'],
@@ -179,8 +183,7 @@ def parse_subject(subject_path, output_size, modalities,tumor_region_only, decod
             img = img[... , tf.newaxis]
             img = resize_func(img, output_size, antialias=True, method='bilinear')
             img = tf.reshape(img, tf.shape(tf.squeeze(img)))
-            #img = tf.cast(img, dtype=tf.uint8)
-            #print("img: ",img)
+            img = tf.cast(img, dtype=tf.uint8)
             return img
         return wrapper
     resize = image_resizer(resize)
@@ -192,12 +195,10 @@ def parse_subject(subject_path, output_size, modalities,tumor_region_only, decod
                 os.path.splitext(name)[0]: crop(decoder(os.path.join(subject_path, modality, name))[:, :, 2] ,output_size, get_tumor_boundingbox(os.path.join(subject_path, modality, name),os.path.join(subject_path, modality+'L', name))) for name in names
             } 
     else:
-        print("entered_tumor_region_false_else_block")
         for modality, names in gathered_modalities_paths.items():
             subject_data[modality] = {
                 os.path.splitext(name)[0]: resize(decoder(os.path.join(subject_path, modality, name))[:, :, 0], output_size)for name in names
             }
-        print("else done")
     return subject_data
 
 def get_class_ID_subjectpath(subject):
