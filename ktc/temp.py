@@ -137,6 +137,7 @@ def prep_combined_modalities(subject, output_size, modalities, tumor_region_only
     else:
         raise NotImplementedError
     
+    
     slices = tf.stack([tf.stack([subject_data[type_][slice_] for type_ in modalities], axis=-1) for slice_ in slice_names])
     slices = tf.stack([slices,clas_tensor],axis=0)
     return dict(

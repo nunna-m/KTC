@@ -1,4 +1,5 @@
 import os
+from numpy.core.numeric import indices
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
 
 import tensorflow as tf
@@ -16,7 +17,7 @@ def prep_combined_modalities(subject, output_size, modalities, tumor_region_only
     else: raise NotImplementedError
     subject_data = parse_subject(subject, output_size, modalities=modalities, tumor_region_only=tumor_region_only)
     slice_names = subject_data[modalities[0]].keys()
-    appending_shape = list(output_size)+[len(modalities)]
+    appending_shape = list(output_size)+[len(modalities)+1]
     if subject_data['clas']=='AML':
         clas_tensor = tf.zeros(appending_shape,dtype=tf.uint8)
     elif subject_data['clas']=='CCRCC':
@@ -24,25 +25,31 @@ def prep_combined_modalities(subject, output_size, modalities, tumor_region_only
     else:
         raise NotImplementedError
     
-    slices = tf.stack(
-        [
-            tf.stack(
-                [
-                    subject_data[type_][slice_] for type_ in modalities
-                ], axis=-1) for slice_ in slice_names
-        ]+clas_tensor)
+    temp_slices = [tf.stack([subject_data[type_][slice_] for type_ in modalities], axis=-1) for slice_ in slice_names]
+    print(clas_tensor)
+    slices = tf.stack([
+        tf.tensor_scatter_nd_add(clas_tensor, indices=tf.constant([[224,224,0],[224,224,1]]),
+                        updates = tf.constant(temp_slices[i])) for i in range(4)
+    ])
+
+    # slices = tf.stack([clas_tensor], axis=-1)
+    # slices = tf.stack(
+    #     [
+    #         tf.stack(
+    #             [
+    #                 subject_data[type_][slice_] for type_ in modalities
+    #             ], axis=-1) for slice_ in slice_names
+    #     ]+clas_tensor)
     print("working slices shape: ",slices.shape)
     
-    for i in range(subject_data['num_slices_per_modality']):
-        print("before: ",slices[i].shape)
-        slices[i] = tf.stack([slices[i],clas_tensor], axis=-1)
-        print("after: ",slices[i].shape)
+    # for i in range(subject_data['num_slices_per_modality']):
+    #     print("before: ",slices[i].shape)
+    #     slices[i] = tf.stack([slices[i],clas_tensor], axis=-1)
+    #     print("after: ",slices[i].shape)
             
     #print(slices)
     #slices = tf.stack([slices[i] for i in range(slices.shape[0]),clas_tensor],axis=-1)
 
-
-    print(slices.shape)
     return dict(
         stacked_modality_slices=slices,
         clas=subject_data['clas'],
