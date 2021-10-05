@@ -11,7 +11,7 @@ AUTOTUNE = tf.data.experimental.AUTOTUNE
 
 def count(ds):
     size = 0
-    for i in ds: 
+    for _ in ds: 
         size += 1
     return size
 
@@ -62,90 +62,89 @@ def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,2
     dataset = tf.data.Dataset.from_tensor_slices(training_subject_paths)
     dataset = dataset.interleave(tf.data.Dataset.list_files)
     dataset = dataset.interleave(
-        partial(
-            combine_modalities,
-            output_size=output_size,
-            modalities=modalities,
-            tumor_region_only=tumor_region_only,
-            return_type='dataset',
-        ),
-        cycle_length=count(dataset),
-        num_parallel_calls=AUTOTUNE,
-    )
+        tf.data.Dataset.from_tensor_slices(
+            lambda x: partial(
+                combine_modalities,
+                output_size, modalities, tumor_region_only
+            )(x)
+        )
+        )
+    tf.data.Dataset.partial_map = partial_map
     if output_size is not None and tumor_region_only==False: 
         dataset = dataset.map(
-            lambda image: tf.image.crop_to_bounding_box(
-                image,
-                ((tf.shape(image)[:2] - output_size) // 2)[0],
-                ((tf.shape(image)[:2] - output_size) // 2)[1],
-                *output_size,
+        lambda subject_data: {
+            'slices': tf.map_fn(
+                lambda image: tf.image.crop_to_bounding_box(
+                    image,
+                    ((tf.shape(image)[:2] - output_size) // 2)[0],
+                    ((tf.shape(image)[:2] - output_size) // 2)[1],
+                    *output_size,),
+                subject_data['stacked_modality_slices'],
             ),
-            AUTOTUNE,
+            'labels':subject_data['labels'],
+            'clas':subject_data['clas'],
+            'ID':subject_data['ID'],
+            'subject_path':subject_data['subject_path'],
+        },
+        AUTOTUNE,
         )
-    
-    dataset = dataset.map(lambda x: tf.reshape(x, [*x.shape[:-1], len(modalities)]), AUTOTUNE)
-    
-    # for item in dataset.take(1):
-    #     print(item)
-    
-    dataset = dataset.map(lambda x: tf.cast(x, dtype=dtype), AUTOTUNE)
-    dataset = dataset.map(lambda x: x / 255.0, AUTOTUNE)
+    else:
+        dataset = dataset.map(
+        lambda subject_data: {
+            'slices': subject_data['stacked_modality_slices'],
+            'labels':subject_data['labels'],
+            'clas':subject_data['clas'],
+            'ID':subject_data['ID'],
+            'subject_path':subject_data['subject_path'],
+        },
+        AUTOTUNE,
+        )
+
+    dataset = dataset.partial_map('slices', lambda x: tf.reshape(x, [*x.shape[:-1], len(modalities)]))
+    dataset = dataset.partial_map('slices', lambda x: tf.cast(x, dtype=dtype))
+    dataset = dataset.partial_map('slices', lambda x: x / 255.0)
 
     return dataset
 
-def combine_modalities(subject, output_size, modalities, tumor_region_only,return_type='array'):
-    
-    # return tf.py_function(
-    #     lambda x: partial(prep_combined_modalities,
-    #     output_size,
-    #     modalities=modalities, tumor_region_only=tumor_region_only)(x)['stacked_modality_slices'],
-    #     [subject],
-    #     tf.uint8,
-    # )
-
-    return_type = return_type.lower()
-    if return_type == 'array':
-        return tf.py_function(
-            lambda x: partial(prep_combined_modalities,
-            output_size=output_size,
-            modalities=modalities, tumor_region_only=tumor_region_only)(x)['stacked_modality_slices'],
-            [subject],
-            tf.uint8,
+def partial_map(dataset, key, function):
+    def wrapper(data):
+        data.update(
+            {
+                key: function(data[key])
+            }
         )
-    elif return_type == 'dataset':
-        return tf.data.Dataset.from_tensor_slices(
-            combine_modalities(subject, output_size,
-            modalities=modalities, tumor_region_only=tumor_region_only, return_type='array')
+        return data
+    dataset = dataset.map(wrapper, AUTOTUNE)
+    return dataset
+
+def convert_to_dict(data):
+    print("DATA: ",data)
+    return dict(
+        slices=tf.cast(data[0], dtype=tf.uint8), 
+        labels=tf.cast(data[1], dtype=tf.uint8)
         )
-    elif return_type == 'infinite_dataset':
-        return combine_modalities(subject, output_size,
-            modalities=modalities, tumor_region_only=tumor_region_only, return_type='dataset').repeat(None)
-    else: raise NotImplementedError
 
-
-def prep_combined_modalities(subject, output_size, modalities, tumor_region_only):
-    #tf.print("entered prep_combined_modalities function")
+def combine_modalities(subject, output_size, modalities, tumor_region_only):
     if isinstance(subject, str): pass
     elif isinstance(subject, tf.Tensor): subject = subject.numpy().decode()
     else: raise NotImplementedError
     subject_data = parse_subject(subject, output_size, modalities=modalities, tumor_region_only=tumor_region_only)
     slice_names = subject_data[modalities[0]].keys()
-    if subject_data['clas']=='AML':
-        clas_tensor = tf.zeros(output_size,dtype=tf.int8)
-    elif subject_data['clas']=='CCRCC':
-        clas_tensor = tf.ones(output_size,dtype=tf.int8)
-    else:
-        raise NotImplementedError
-    
     
     slices = tf.stack([tf.stack([subject_data[type_][slice_] for type_ in modalities], axis=-1) for slice_ in slice_names])
-    slices = tf.stack([slices,clas_tensor],axis=0)
+    labels = get_label(subject_data['clas'],slices.shape[0])
     return dict(
         stacked_modality_slices=slices,
-        clas=subject_data['clas'],
-        ID=subject_data['ID'],
+        labels=labels,
         subject_path=subject_data['subject_path'],
     )
+
+def get_label(clas,num_slices):
+    if clas=='AML':
+        labels = tf.zeros([num_slices], dtype=tf.uint8)
+    elif clas=='CCRCC':
+        labels = tf.ones([num_slices], dtype=tf.uint8)
+    return labels
 
 
 def parse_subject(subject_path, output_size, modalities,tumor_region_only, decoder=tf.image.decode_image, resize=tf.image.resize):
