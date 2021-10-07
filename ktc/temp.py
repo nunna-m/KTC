@@ -59,19 +59,38 @@ def train_dataset(
 def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,224), tumor_region_only=False, dtype=tf.float32):
     
     training_subject_paths = glob.glob(os.path.join(traindir,*'*'*2))
-    dataset = tf.data.Dataset.from_tensor_slices(training_subject_paths)
-    dataset = dataset.interleave(tf.data.Dataset.list_files)
-    dataset = dataset.interleave(
-        tf.data.Dataset.from_tensor_slices(
-            lambda x: partial(
-                combine_modalities,
-                output_size, modalities, tumor_region_only
-            )(x)
+    print(training_subject_paths)
+    ds = tf.data.Dataset.from_tensor_slices(training_subject_paths)
+    #ds = ds.interleave(tf.data.Dataset.list_files(shuffle=False))
+    label_ds = ds.interleave(
+            lambda subject_path: tf.data.Dataset.from_generator(
+                get_label, args=(subject_path,),
+                output_signature=tf.TensorSpec(shape=(), dtype=tf.int32)),
+            cycle_length=count(ds),
+            num_parallel_calls=tf.data.experimental.AUTOTUNE,
         )
+    feature_ds = ds.interleave(
+            partial(
+                tf_combine_modalities,
+                output_size=output_size,
+                modalities=modalities,
+                tumor_region_only=tumor_region_only,
+                return_type='dataset',
+            ),
+            cycle_length=count(ds),
+            num_parallel_calls=tf.data.experimental.AUTOTUNE,
         )
+    
+    ds = tf.data.Dataset.zip((feature_ds, label_ds))
+    ds = ds.map(
+        lambda feature,label: duplicate_label(feature,label),
+        num_parallel_calls=tf.data.experimental.AUTOTUNE)
+    for ele in ds.as_numpy_iterator():
+        print(ele[0].shape, ele[1].shape)
+    return feature_ds
     tf.data.Dataset.partial_map = partial_map
     if output_size is not None and tumor_region_only==False: 
-        dataset = dataset.map(
+        ds= ds.map(
         lambda subject_data: {
             'slices': tf.map_fn(
                 lambda image: tf.image.crop_to_bounding_box(
@@ -89,7 +108,7 @@ def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,2
         AUTOTUNE,
         )
     else:
-        dataset = dataset.map(
+        ds = ds.map(
         lambda subject_data: {
             'slices': subject_data['stacked_modality_slices'],
             'labels':subject_data['labels'],
@@ -100,11 +119,11 @@ def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,2
         AUTOTUNE,
         )
 
-    dataset = dataset.partial_map('slices', lambda x: tf.reshape(x, [*x.shape[:-1], len(modalities)]))
-    dataset = dataset.partial_map('slices', lambda x: tf.cast(x, dtype=dtype))
-    dataset = dataset.partial_map('slices', lambda x: x / 255.0)
+    ds = ds.partial_map('slices', lambda x: tf.reshape(x, [*x.shape[:-1], len(modalities)]))
+    ds = ds.partial_map('slices', lambda x: tf.cast(x, dtype=dtype))
+    ds = ds.partial_map('slices', lambda x: x / 255.0)
 
-    return dataset
+    return ds
 
 def partial_map(dataset, key, function):
     def wrapper(data):
@@ -124,6 +143,25 @@ def convert_to_dict(data):
         labels=tf.cast(data[1], dtype=tf.uint8)
         )
 
+def tf_combine_modalities(subject_path, output_size, modalities, tumor_region_only,return_type='array'):
+    return_type  =return_type.lower()
+    if return_type == 'array':
+        return tf.py_function(
+            lambda x: partial(combine_modalities, output_size=output_size,
+            modalities=modalities,
+            tumor_region_only=tumor_region_only)(x),
+            [subject_path],
+            Tout=[tf.uint8],
+        )
+        return partial()
+    elif return_type == 'dataset':
+        return tf.data.Dataset.from_tensor_slices(
+            tf_combine_modalities(subject_path=subject_path,output_size=output_size,
+            modalities=modalities,
+            tumor_region_only=tumor_region_only, return_type='array')
+        )
+    else: raise NotImplementedError
+
 def combine_modalities(subject, output_size, modalities, tumor_region_only):
     if isinstance(subject, str): pass
     elif isinstance(subject, tf.Tensor): subject = subject.numpy().decode()
@@ -132,20 +170,38 @@ def combine_modalities(subject, output_size, modalities, tumor_region_only):
     slice_names = subject_data[modalities[0]].keys()
     
     slices = tf.stack([tf.stack([subject_data[type_][slice_] for type_ in modalities], axis=-1) for slice_ in slice_names])
-    labels = get_label(subject_data['clas'],slices.shape[0])
+    #labels = get_label(subject_data['clas'],slices.shape[0])
+    return slices
     return dict(
         stacked_modality_slices=slices,
         labels=labels,
+        features_labels=(slices,labels),
         subject_path=subject_data['subject_path'],
     )
 
-def get_label(clas,num_slices):
+def get_label(subject):
+    if isinstance(subject, str): 
+        pass
+    elif isinstance(subject, bytes): 
+        subject = subject.decode()
+    else: raise NotImplementedError
+    clas, _ = get_class_ID_subjectpath(subject)
     if clas=='AML':
-        labels = tf.zeros([num_slices], dtype=tf.uint8)
+        yield 0
+        #labels = tf.zeros(shape=(num_slices,1), dtype=tf.int32)
     elif clas=='CCRCC':
-        labels = tf.ones([num_slices], dtype=tf.uint8)
-    return labels
+        yield 1
+        #labels = tf.ones(shape=(num_slices,1), dtype=tf.int32)
+    #return labels
 
+def duplicate_label(feature, label):
+    print(feature, label)
+    (feature_shape, label_shape) = (tf.shape(feature), tf.shape(label))
+    print(feature_shape, label_shape)
+    label = tf.tile(
+        tf.convert_to_tensor(label, dtype=tf.int32), [feature_shape[0],1])
+    print(label)
+    return (feature,label)
 
 def parse_subject(subject_path, output_size, modalities,tumor_region_only, decoder=tf.image.decode_image, resize=tf.image.resize):
     subject_data = {'subject_path': subject_path}
