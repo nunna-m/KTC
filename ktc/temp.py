@@ -64,8 +64,9 @@ def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,2
     #ds = ds.interleave(tf.data.Dataset.list_files(shuffle=False))
     label_ds = ds.interleave(
             lambda subject_path: tf.data.Dataset.from_generator(
-                get_label, args=(subject_path,modalities[0],),),#output_signature=tf.TensorSpec(shape=(None,1), 
-                #dtype=tf.int32)),
+                get_label, args=(subject_path,modalities[0],),output_signature=(
+         tf.TensorSpec(shape=(), dtype=tf.int32),
+         tf.RaggedTensorSpec(shape=(2, None), dtype=tf.int32))),
             cycle_length=count(ds),
             num_parallel_calls=tf.data.experimental.AUTOTUNE,
         )
