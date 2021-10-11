@@ -64,8 +64,8 @@ def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,2
     #ds = ds.interleave(tf.data.Dataset.list_files(shuffle=False))
     label_ds = ds.interleave(
             lambda subject_path: tf.data.Dataset.from_generator(
-                get_label, args=(subject_path,),
-                output_signature=tf.TensorSpec(shape=(), dtype=tf.int32)),
+                get_label, args=(subject_path,modalities[0],),),#output_signature=tf.TensorSpec(shape=(None,1), 
+                #dtype=tf.int32)),
             cycle_length=count(ds),
             num_parallel_calls=tf.data.experimental.AUTOTUNE,
         )
@@ -82,9 +82,7 @@ def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,2
         )
     
     ds = tf.data.Dataset.zip((feature_ds, label_ds))
-    ds = ds.map(
-        lambda feature,label: duplicate_label(feature,label),
-        num_parallel_calls=tf.data.experimental.AUTOTUNE)
+    #new_label = ds.map(duplicate_label)
     for ele in ds.as_numpy_iterator():
         print(ele[0].shape, ele[1].shape)
     return feature_ds
@@ -179,29 +177,32 @@ def combine_modalities(subject, output_size, modalities, tumor_region_only):
         subject_path=subject_data['subject_path'],
     )
 
-def get_label(subject):
+def get_label(subject, modality):
     if isinstance(subject, str): 
         pass
     elif isinstance(subject, bytes): 
         subject = subject.decode()
+        modality = modality.decode()
     else: raise NotImplementedError
     clas, _ = get_class_ID_subjectpath(subject)
+    required_path = os.path.join(subject, modality)
+    num_slices = len([name for name in os.listdir(required_path) if os.path.isfile(name)])
     if clas=='AML':
-        yield 0
+        yield np.array([0]*num_slices)
         #labels = tf.zeros(shape=(num_slices,1), dtype=tf.int32)
     elif clas=='CCRCC':
-        yield 1
+        yield np.array([1]*num_slices)
         #labels = tf.ones(shape=(num_slices,1), dtype=tf.int32)
     #return labels
 
 def duplicate_label(feature, label):
-    print(feature, label)
-    (feature_shape, label_shape) = (tf.shape(feature), tf.shape(label))
-    print(feature_shape, label_shape)
-    label = tf.tile(
-        tf.convert_to_tensor(label, dtype=tf.int32), [feature_shape[0],1])
-    print(label)
-    return (feature,label)
+    # num_slices = tf.shape(feature)[0]
+    # repeat = tf.dtypes.cast(num_slices, tf.int32)
+    # label = tf.tile(
+    #     label, (repeat,1))
+    return (feature, label)
+
+    #return (feature.get_shape(), label.get_shape())
 
 def parse_subject(subject_path, output_size, modalities,tumor_region_only, decoder=tf.image.decode_image, resize=tf.image.resize):
     subject_data = {'subject_path': subject_path}
