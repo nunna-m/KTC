@@ -64,9 +64,7 @@ def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,2
     #ds = ds.interleave(tf.data.Dataset.list_files(shuffle=False))
     label_ds = ds.interleave(
             lambda subject_path: tf.data.Dataset.from_generator(
-                get_label, args=(subject_path,modalities[0],),output_signature=(
-         tf.TensorSpec(shape=(), dtype=tf.int32),
-         tf.RaggedTensorSpec(shape=(2, None), dtype=tf.int32))),
+                get_label, args=(subject_path,modalities[0],),output_signature=(tf.TensorSpec(shape=(None, 1), dtype=tf.int32))),
             cycle_length=count(ds),
             num_parallel_calls=tf.data.experimental.AUTOTUNE,
         )
@@ -83,47 +81,48 @@ def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,2
         )
     
     ds = tf.data.Dataset.zip((feature_ds, label_ds))
-    #new_label = ds.map(duplicate_label)
-    for ele in ds.as_numpy_iterator():
-        print(ele[0].shape, ele[1].shape)
+    #ds = ds.map(lambda image, label: tf.py_function(flatten,[image, label], [tf.float32, tf.int32]))
+    # for ele in ds.as_numpy_iterator():
+    #     print(ele[0].shape, ele[1].shape)
+    
+    # ds = ds.map(lambda image, label: size_check(image, label))
+    # if output_size is not None and tumor_region_only==False: 
+    #     ds = ds.map(
+    #         lambda image, label: tf_crop_bounding_box(image, label, output_size=output_size),
+    #         tf.data.experimental.AUTOTUNE,
+    #     )
+    
+    #ds = ds.map(lambda image, label: tf_reshape_cast_normalize(image, label, num_mod=len(modalities), dtype=dtype), tf.data.experimental.AUTOTUNE)
+    
+    # for ele in ds.as_numpy_iterator():
+    #     print(ele[0].shape, ele[1].shape)
+    iterator = iter(ds)
+    ele = iterator.get_next()
+    print(ele[0].shape, ele[1])
     return feature_ds
-    tf.data.Dataset.partial_map = partial_map
-    if output_size is not None and tumor_region_only==False: 
-        ds= ds.map(
-        lambda subject_data: {
-            'slices': tf.map_fn(
-                lambda image: tf.image.crop_to_bounding_box(
-                    image,
-                    ((tf.shape(image)[:2] - output_size) // 2)[0],
-                    ((tf.shape(image)[:2] - output_size) // 2)[1],
-                    *output_size,),
-                subject_data['stacked_modality_slices'],
-            ),
-            'labels':subject_data['labels'],
-            'clas':subject_data['clas'],
-            'ID':subject_data['ID'],
-            'subject_path':subject_data['subject_path'],
-        },
-        AUTOTUNE,
-        )
-    else:
-        ds = ds.map(
-        lambda subject_data: {
-            'slices': subject_data['stacked_modality_slices'],
-            'labels':subject_data['labels'],
-            'clas':subject_data['clas'],
-            'ID':subject_data['ID'],
-            'subject_path':subject_data['subject_path'],
-        },
-        AUTOTUNE,
-        )
-
-    ds = ds.partial_map('slices', lambda x: tf.reshape(x, [*x.shape[:-1], len(modalities)]))
-    ds = ds.partial_map('slices', lambda x: tf.cast(x, dtype=dtype))
-    ds = ds.partial_map('slices', lambda x: x / 255.0)
-
     return ds
 
+def flatten(image, label):
+    flattened = []
+    for i in range(image.shape[0]):
+        flattened.append([image[i], label[i]])
+    return (flattened)
+
+def tf_reshape_cast_normalize(image, label, num_mod, dtype):
+    image = tf.reshape(image, [*image.shape[:-1], num_mod])
+    image = tf.cast(image, dtype=dtype)
+    image = (image / 255.0)
+    return image, label
+
+def tf_crop_bounding_box(image, label, output_size):
+    image = tf.image.crop_to_bounding_box(
+        image,
+        ((tf.shape(image)[:2] - output_size) // 2)[0],
+        ((tf.shape(image)[:2] - output_size) // 2)[1],
+        *output_size,
+    )
+    #print(image.shape, label.shape)
+    return image, label
 def partial_map(dataset, key, function):
     def wrapper(data):
         data.update(
@@ -187,14 +186,15 @@ def get_label(subject, modality):
     else: raise NotImplementedError
     clas, _ = get_class_ID_subjectpath(subject)
     required_path = os.path.join(subject, modality)
-    num_slices = len([name for name in os.listdir(required_path) if os.path.isfile(name)])
+    num = len([name for name in os.listdir(required_path) if os.path.isfile(os.path.join(required_path,name))])
+    num_slices = tf.constant([num,1], tf.int32)
     if clas=='AML':
-        yield np.array([0]*num_slices)
-        #labels = tf.zeros(shape=(num_slices,1), dtype=tf.int32)
+        label = tf.constant([[0]], tf.int32)
     elif clas=='CCRCC':
-        yield np.array([1]*num_slices)
-        #labels = tf.ones(shape=(num_slices,1), dtype=tf.int32)
-    #return labels
+        label = tf.constant([[1]], tf.int32)
+    final = tf.tile(label, num_slices)
+    yield final
+
 
 def duplicate_label(feature, label):
     # num_slices = tf.shape(feature)[0]
