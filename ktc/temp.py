@@ -114,8 +114,8 @@ def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,2
             ),
             tf.data.experimental.AUTOTUNE,
         )
-    feature_ds = feature_ds.map(lambda x: tf.reshape(x, [*x.shape[:-1], len(modalities)]), tf.data.experimental.AUTOTUNE)
-    #feature_ds = feature_ds.map(lambda image: tf_reshape_cast_normalize(image, num_mod=len(modalities), dtype=dtype), tf.data.experimental.AUTOTUNE)
+    #feature_ds = feature_ds.map(lambda x: tf.reshape(x, [*x.shape[:-1], len(modalities)]), tf.data.experimental.AUTOTUNE)
+    feature_ds = feature_ds.map(lambda image: tf_reshape_cast_normalize(image, num_mod=len(modalities), dtype=dtype), tf.data.experimental.AUTOTUNE)
     #ds = tf.data.Dataset.zip((feature_ds, label_ds))
     i = 0
     for ele in feature_ds.as_numpy_iterator():
@@ -130,7 +130,7 @@ def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,2
 
 
 def tf_reshape_cast_normalize(image, num_mod, dtype):
-    print(image.shape)
+    print("in tf_reshape: ",image.shape)
     image = tf.reshape(image, [*image.shape[:-1], num_mod])
     image = tf.cast(image, dtype=dtype)
     image = (image / 255.0)
@@ -403,7 +403,7 @@ def configure_dataset(dataset, batch_size, buffer_size, repeat=False):
     dataset = dataset.prefetch(tf.data.experimental.AUTOTUNE)
     return dataset
 
-final_dataset = train_dataset(data_root='/home/maanvi/LAB/Datasets/sample_kt',batch_size=4,buffer_size=10,repeat=True,modalities=('am','tm'),output_size=(224,224),aug_configs=None,tumor_region_only=False)
+final_dataset = train_dataset(data_root='D:/01_Maanvi/LABB/datasets/sample_kt',batch_size=4,buffer_size=10,repeat=True,modalities=('am','tm'),output_size=(224,224),aug_configs=None,tumor_region_only=False)
 
 # parse_subject(
 #     subject_path='/home/maanvi/LAB/Datasets/sample_kt/am_tm/train/CCRCC/18626417',
@@ -467,3 +467,6 @@ print("done generating dataset")
 # subject_data = parse_subject(subject_path='/home/maanvi/LAB/Datasets/kidney_tumor_trainvaltest/am_tm/train/AML/87345564', output_size = (224,224), modalities=['am','tm'], tumor_region_only=False)
 
 # print(subject_data)
+
+#https://github.com/tensorflow/tensorflow/issues/1029
+#problem in line 300 convert_to_tensor
