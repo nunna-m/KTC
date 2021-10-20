@@ -1,20 +1,20 @@
 '''
 abstraction for tf.data.Dataset API
 '''
-from ktc.utils import data
 import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
+
 import tensorflow as tf
 import numpy as np
 import glob
-from functools import partial, wraps
+from functools import partial
 import cv2
+import sys
+import matplotlib.pyplot as plt
 import tensorflow_addons as tfa
 
 
-AUTOTUNE = tf.data.experimental.AUTOTUNE
-
-
-def train_dataset(
+def train_ds(
     data_root,
     batch_size,
     buffer_size,
@@ -29,9 +29,7 @@ def train_dataset(
             'random_crop':{},
         }
     default_aug_configs = {
-        random_crop_img: {
-            output_size:output_size,
-        },
+        random_crop_img: dict(output_size=output_size),
         random_horizontalflip_img: {},
         random_verticalflip_img: {},
         random_contrast_img:  dict(channels=list(range(len(modalities)))),
@@ -41,48 +39,84 @@ def train_dataset(
         random_rotation_img: {},
         random_shear_img: {},
     }
-    traindir = os.path.join(data_root,'_'.join(modalities),'train')
+    #print("Data_root---------:",data_root)
+    traindir = os.path.join(data_root[0],'_'.join(modalities),'train')
     dataset = load_raw(
         traindir,
         modalities=modalities,
         output_size=output_size,
         tumor_region_only = tumor_region_only
     )
-
     dataset = augmentation(
         dataset,
         methods=parse_aug_configs(aug_configs,
                                     default_aug_configs),
     )
 
-    dataset = image_label(dataset, modalities=modalities)
     dataset = configure_dataset(
         dataset,
         batch_size,
         buffer_size,
         repeat=repeat
     )
-
+    print("Final dataset:  ",dataset)
     return dataset
+def eval_ds(
+    data_root,
+    batch_size,
+    modalities=('TRA', 'ADC', 'DWI', 'DCEE', 'DCEL', 'label'),
+    include_meta=False,
+    output_size=(224,224),
+    tumor_region_only=False,
+):
+    evaldir = os.path.join(data_root,'_'.join(modalities),'eval')
+    ds = load_raw(
+        evaldir,
+        modalities=modalities,
+        output_size=output_size,
+        tumor_region_only = tumor_region_only
+    )
+    ds = ds.batch(batch_size)
+    ds = ds.prefetch(tf.data.experimental.AUTOTUNE)
+    return ds
+
+def predict_ds(data_root, modalities):
+    testdir = os.path.join(data_root,'_'.join(modalities),'eval')
+    ds = load_raw(testdir,modalities=modalities)
+    ds = ds.batch(1)
+    return ds
 
 def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,224), tumor_region_only=False, dtype=tf.float32):
     
     training_subject_paths = glob.glob(os.path.join(traindir,*'*'*2))
-    dataset = tf.data.Dataset.from_tensor_slices(training_subject_paths)
-    dataset = dataset.interleave(tf.data.Dataset.list_files)
-    dataset = dataset.interleave(
-        partial(
-            combine_modalities,
-            output_size=output_size,
-            modalities=modalities,
-            tumor_region_only=tumor_region_only,
-        ),
-        cycle_length=data.count(dataset),
-        num_parallel_calls=tf.data.experimental.AUTOTUNE,
-    )
-
-    if output_size is not None and tumor_region_only==False: 
-        dataset = dataset.map(
+    #print(training_subject_paths)
+    ds = tf.data.Dataset.from_tensor_slices(training_subject_paths)
+    
+    label_ds = ds.interleave(
+            partial(
+                tf_combine_labels,
+                modalities=modalities,
+                return_type='dataset',
+            ),
+            cycle_length=count(ds),
+            #cycle_length=1,
+            num_parallel_calls=tf.data.experimental.AUTOTUNE,
+        )
+    label_ds = label_ds.map(convert_one_hot)
+    feature_ds = ds.interleave(
+            partial(
+                tf_combine_modalities,
+                output_size=output_size,
+                modalities=modalities,
+                tumor_region_only=tumor_region_only,
+                return_type='dataset',
+            ),
+            cycle_length=count(ds),
+            #cycle_length=1,
+            num_parallel_calls=tf.data.experimental.AUTOTUNE,
+        )
+    
+    if output_size is not None: feature_ds = feature_ds.map(
             lambda image: tf.image.crop_to_bounding_box(
                 image,
                 ((tf.shape(image)[:2] - output_size) // 2)[0],
@@ -91,45 +125,108 @@ def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,2
             ),
             tf.data.experimental.AUTOTUNE,
         )
-    dataset = dataset.map(lambda x: tf.reshape(x, [*x.shape[:-1], len(modalities)]), AUTOTUNE)
-    dataset = dataset.map(lambda x: tf.cast(x, dtype=dtype), AUTOTUNE)
-    dataset = dataset.map(lambda x: x / 255.0, AUTOTUNE)
 
+    ds = tf.data.Dataset.zip((feature_ds, label_ds))
 
-    return dataset
+    ds = ds.map(lambda image, label: tf_reshape_cast_normalize(image, label, num_mod=len(modalities), dtype=dtype), tf.data.experimental.AUTOTUNE)
+    
+    
+    return ds
 
-def filter_modalities(paths,modalities):
-    assert isinstance(paths,list)
-    labels = list(map(lambda x: x+'L',modalities))
-    modalities = list(modalities) + labels
-    paths = list(
-        filter(
-            lambda x: os.path.split(x)[0].rsplit(os.path.sep,1)[1] in modalities, 
-        paths))
-    return paths
+def convert_one_hot(label):
+    label = tf.one_hot(label,2, dtype=tf.int32)
+    return label
 
-def combine_modalities(subject, output_size, modalities=('am','tm','dc','ec','pc'), tumor_region_only=False):
-    return tf.py_function(
-        lambda x: partial(prep_combined_modalities,
-        output_size,
-        modalities=modalities, tumor_region_only=tumor_region_only)(x)['stacked_modality_slices'],
-        [subject],
-        tf.uint8,
+def tf_reshape_cast_normalize(image, label, num_mod, dtype):
+    #print("in tf_reshape: ",image.shape)
+    image = tf.reshape(image, [*image.shape[:-1], num_mod])
+    image = tf.cast(image, dtype=dtype)
+    image = (image / 255.0)
+    return image, label
+
+def tf_crop_bounding_box(image, label, output_size):
+    image = tf.image.crop_to_bounding_box(
+        image,
+        ((tf.shape(image)[:2] - output_size) // 2)[0],
+        ((tf.shape(image)[:2] - output_size) // 2)[1],
+        *output_size,
     )
+    #print(image.shape, label.shape)
+    return image, label
 
-def prep_combined_modalities(subject, output_size, modalities, tumor_region_only):
+def tf_combine_labels(subject_path, modalities,return_type='array'):
+    return_type  =return_type.lower()
+    modality = modalities[0]
+    if return_type == 'array':
+        return tf.py_function(
+            lambda x: partial(get_label,
+            modality=modality)(x),
+            [subject_path],
+            tf.int32,
+        )
+    elif return_type == 'dataset':
+        return tf.data.Dataset.from_tensor_slices(
+            tf_combine_labels(subject_path=subject_path,
+            modalities=modalities, return_type='array')
+        )
+    else: raise NotImplementedError
+
+def get_label(subject, modality):
+    if isinstance(subject, str): 
+        pass
+    elif isinstance(subject, tf.Tensor): 
+        subject = subject.numpy().decode()
+        #modality = modality.numpy().decode()
+    else: raise NotImplementedError
+    clas, _ = get_class_ID_subjectpath(subject)
+    required_path = os.path.join(subject, modality)
+    num = len([name for name in os.listdir(required_path) if os.path.isfile(os.path.join(required_path,name))])
+    num_slices = tf.constant([num], tf.int32)
+    if clas=='AML':
+        label = tf.constant([0], tf.int32)
+    elif clas=='CCRCC':
+        label = tf.constant([1], tf.int32)
+    final = tf.tile(label, num_slices)
+    #print("labels in get_label: ",final.numpy())
+    return final
+    #yield final
+
+def tf_combine_modalities(subject_path, output_size, modalities, tumor_region_only,return_type='array'):
+    return_type  =return_type.lower()
+    if return_type == 'array':
+        return tf.py_function(
+            lambda x: partial(combine_modalities, output_size=output_size,
+            modalities=modalities,
+            tumor_region_only=tumor_region_only)(x)['slices'],
+            [subject_path],
+            tf.uint8,
+        )
+    elif return_type == 'dataset':
+        return tf.data.Dataset.from_tensor_slices(
+            tf_combine_modalities(subject_path=subject_path,output_size=output_size,
+            modalities=modalities,
+            tumor_region_only=tumor_region_only, return_type='array')
+        )
+    else: raise NotImplementedError
+
+def combine_modalities(subject, output_size, modalities, tumor_region_only):
     if isinstance(subject, str): pass
+    elif isinstance(subject, tf.Tensor): subject = subject.numpy().decode()
     else: raise NotImplementedError
     subject_data = parse_subject(subject, output_size, modalities=modalities, tumor_region_only=tumor_region_only)
     slice_names = subject_data[modalities[0]].keys()
-
+    
     slices = tf.stack([tf.stack([subject_data[type_][slice_] for type_ in modalities], axis=-1) for slice_ in slice_names])
+    #labels = get_label(subject_data['clas'],slices.shape[0])
+    #print("Slices in combine mods: ",slices.shape)
+    #return slices
     return dict(
-        stacked_modality_slices=slices,
-        clas=subject_data['clas'],
-        ID=subject_data['ID'],
+        slices=slices,
+        #labels=labels,
+        #features_labels=(slices,labels),
         subject_path=subject_data['subject_path'],
     )
+
 
 def parse_subject(subject_path, output_size, modalities,tumor_region_only, decoder=tf.image.decode_image, resize=tf.image.resize):
     subject_data = {'subject_path': subject_path}
@@ -167,6 +264,7 @@ def parse_subject(subject_path, output_size, modalities,tumor_region_only, decod
             img = img[... , tf.newaxis]
             img = resize_func(img, output_size, antialias=True, method='bilinear')
             img = tf.reshape(img, tf.shape(tf.squeeze(img)))
+            img = tf.cast(img, dtype=tf.uint8)
             return img
         return wrapper
     resize = image_resizer(resize)
@@ -175,15 +273,13 @@ def parse_subject(subject_path, output_size, modalities,tumor_region_only, decod
     if tumor_region_only:
         for modality, names in gathered_modalities_paths.items():
             subject_data[modality] = {
-                os.path.splitext(name)[0]: crop(decoder(os.path.join(subject_path, modality, name))[:, :, 2] ,output_size, get_tumor_boundingbox(os.path.join(subject_path, modality, name),os.path.join(subject_path, modality+'L', name))) for name in names
+                os.path.splitext(name)[0]: crop(decoder(os.path.join(subject_path, modality, name))[:, :, 0] ,output_size, get_tumor_boundingbox(os.path.join(subject_path, modality, name),os.path.join(subject_path, modality+'L', name))) for name in names
             } 
     else:
         for modality, names in gathered_modalities_paths.items():
             subject_data[modality] = {
-                #os.path.splitext(name)[0]: resize(decoder(os.path.join(subject_path, modality, name))[:, :, 0], output_size)for name in names
-                os.path.splitext(name)[0]: decoder(os.path.join(subject_path, modality, name))[:, :, 0]for name in names
+                os.path.splitext(name)[0]: resize(decoder(os.path.join(subject_path, modality, name))[:, :, 0], output_size)for name in names
             }
-    
     return subject_data
 
 def get_class_ID_subjectpath(subject):
@@ -210,6 +306,7 @@ def crop(img, resize_shape, crop_dict):
         assert i>0, f'height or width going out of bounds'
     
     img = tf.convert_to_tensor(img, dtype=tf.uint8)
+    #tf.cast(img, dtype=)
     return img
 
 def get_tumor_boundingbox(imgpath, labelpath):
@@ -280,12 +377,12 @@ def augmentation_method(method_in_str):
 
 def random_crop_img(dataset, **configs):
     dataset = dataset.map(
-        lambda image: random_crop(image, **configs),
-        num_parallel_calls=AUTOTUNE,
+        lambda image,label: random_crop(image, label,**configs),
+        num_parallel_calls=tf.data.experimental.AUTOTUNE,
     )
     return dataset
 
-def random_crop(img, output_size=(224,224), stddev=4, max_=6, min_=-6):
+def random_crop(img, label, output_size=(224,224), stddev=4, max_=6, min_=-6):
     threshold = tf.clip_by_value(tf.cast(tf.random.normal([2],stddev=stddev), tf.int32), min_, max_)
     diff = (tf.shape(img)[:2] - output_size) // 2 + threshold
     img = tf.image.crop_to_bounding_box(
@@ -294,30 +391,39 @@ def random_crop(img, output_size=(224,224), stddev=4, max_=6, min_=-6):
         diff[1],
         *output_size,
     )
-    return img
+    return img, label
 
 def random_horizontalflip_img(dataset):
     dataset = dataset.map(
-        tf.image.random_flip_left_right,
-        num_parallel_calls=AUTOTUNE,
+        lambda image, label: random_horizontalflip(image, label),
+        num_parallel_calls=tf.data.experimental.AUTOTUNE,
     )
     return dataset
+
+def random_horizontalflip(image, label):
+    image = tf.image.random_flip_left_right(image)
+    return image, label
 
 def random_verticalflip_img(dataset):
     dataset = dataset.map(
-        tf.image.random_flip_up_down,
-        num_parallel_calls=AUTOTUNE,
+        lambda image, label:
+        random_verticalflip(image, label),
+        num_parallel_calls=tf.data.experimental.AUTOTUNE,
     )
     return dataset
+
+def random_verticalflip(image, label):
+    image = tf.image.random_flip_up_down(image)
+    return image, label
 
 def random_contrast_img(dataset, channels, lower=0.8, upper=1.2):
     dataset = dataset.map(
-        lambda image: random_contrast(image, lower=lower, upper=upper, channels=channels),
-        num_parallel_calls=AUTOTUNE,
+        lambda image, label: random_contrast(image, label,lower=lower, upper=upper, channels=channels),
+        num_parallel_calls=tf.data.experimental.AUTOTUNE,
     )
     return dataset
 
-def random_contrast(img, lower, upper, channels):
+def random_contrast(img, label, lower, upper, channels):
     skip_channels = [i for i in range(img.shape[-1]) if i not in channels]
 
     picked_channels_img = tf.gather(img, channels, axis=2)
@@ -330,71 +436,87 @@ def random_contrast(img, lower, upper, channels):
         key=lambda CW:CW[0],
                 ),
     ))
+    print("INDICESS----:",indices)
     img = tf.gather(img, indices, axis=2)
-    return img
+    return img, label
 
 def random_brightness_img(dataset, max_delta=0.2):
     dataset = dataset.map(
-        lambda img: tf.image.random_brightness(img,
+        lambda img,label: random_brightness(img,label,
         max_delta=max_delta),
-        num_parallel_calls=AUTOTUNE,
+        num_parallel_calls=tf.data.experimental.AUTOTUNE,
     )
     return dataset
+
+def random_brightness(image, label, max_delta):
+    image = tf.image.random_brightness(image, max_delta=max_delta)
+    return image, label
 
 def random_saturation_img(dataset, lower=5, upper=10):
-    if dataset[0].shape[-1] < 3:
+    if dataset[0][0].shape[-1] < 3:
         return dataset
     dataset = dataset.map(
-        lambda img: tf.image.random_saturation(img,
+        lambda img, label: random_saturation(img, label,
         lower=lower, upper=upper),
-        num_parallel_calls=AUTOTUNE,
+        num_parallel_calls=tf.data.experimental.AUTOTUNE,
     )
     return dataset
 
+def random_saturation(image, label, lower, upper):
+    image = tf.image.random_saturation(image,
+        lower=lower, upper=upper)
+    return image, label
+
 def random_hue_img(dataset, max_delta=0.2):
-    if dataset[0].shape[-1] < 3:
+    if dataset[0][0].shape[-1] < 3:
         return dataset
     dataset = dataset.map(
         lambda img: tf.image.random_hue(img, max_delta=max_delta),
-        num_parallel_calls=AUTOTUNE,
+        num_parallel_calls=tf.data.experimental.AUTOTUNE,
     )
     return dataset
+
+def random_hue(image, label, max_delta):
+    image = tf.image.random_hue(image, max_delta=max_delta)
+    return image, label
 
 def random_rotation_img(dataset):
     dataset = dataset.map(
-        lambda img: random_rotation(img),
-        num_parallel_calls=AUTOTUNE,
+        lambda img, label: random_rotation(img, label),
+        num_parallel_calls=tf.data.experimental.AUTOTUNE,
     )
     return dataset
 
-def random_rotation(img, angle_range=(-5,5),interpolation='bilinear',fill_mode='nearest'):
+def random_rotation(img, label, angle_range=(-5,5),interpolation='bilinear',fill_mode='nearest'):
     angle = tf.random.uniform(shape=[1], minval=angle_range[0], maxval=angle_range[1])
     img = tfa.image.rotate(img, angle=angle,
     interpolation=interpolation,
     fill_mode=fill_mode)
-    return img
+    return img, label
 
 def random_shear_img(dataset, x=(-10,10), y=(-10,10)):
     x_axis = tf.random.uniform(shape=[1], minval=y[0], maxval=y[1])
     y_axis = tf.random.uniform(shape=[1], minval=x[0], maxval=x[1])
     dataset = dataset.map(
-        lambda img: tfa.image.shear_x(img, y_axis, [1]),
-        num_paralell_calls=AUTOTUNE,
+        lambda img, label: tfa.image.shear_x(img, y_axis, [1]),
+        num_paralell_calls=tf.data.experimental.AUTOTUNE,
     )
     dataset = dataset.map(
-        lambda img: tfa.image.shear_y(img, x_axis, [1]),
-        num_paralell_calls=AUTOTUNE,
+        lambda img, label: tfa.image.shear_y(img, x_axis, [1]),
+        num_paralell_calls=tf.data.experimental.AUTOTUNE,
     )
-    return dataset
-
-def image_label(dataset, modalities=('am','tm','dc','ec','pc')):
-    feature_indices = [i for i in range(len(modalities))]
-    clas_index = len(modalities)
-    
-    def convert(data):
-        data.update({'x':data, 'y':clas_index})
     return dataset
 
 def configure_dataset(dataset, batch_size, buffer_size, repeat=False):
-    return dataset 
+    dataset = dataset.shuffle(buffer_size)
+    if repeat:
+        dataset = dataset.repeat(None)
+    dataset = dataset.batch(batch_size)
+    dataset = dataset.prefetch(tf.data.experimental.AUTOTUNE)
+    return dataset
 
+def count(ds):
+    size = 0
+    for _ in ds: 
+        size += 1
+    return size

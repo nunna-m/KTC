@@ -5,54 +5,99 @@ CLI for train command
 import os
 import yaml
 
-from ktc.utils import get, store
+from ktc.utils import get, store, load, dump
 from ktc import dataset
 
+'''
+interface for training models
+'''
+
+# built-in
+import pdb
+import os
+import argparse
+
+# external
+import tensorflow as tf
+from tensorflow import keras
+import dsargparse
+import yaml
+
+# customs
+from ktc.utils import get, store, load, dump
+from ktc import dataset, engine
+from ktc.models.tf_models import vanillacnn
+
 def train(
-    path_data,
-    path_save,
-    filename_configs_save,
-    configfilepaths,
-    epochs,
-    early_stop_count,
-    checkpoint_freq,
+    config,
+    save_path,
+    data_path,
+    max_steps,
+    early_stop_steps=None,
+    save_freq=500,
     validate=False,
-    path_val_data=None,
+    val_data_path=None,
+    visualize=False,
+    profile=False,
 ):
     '''
-    Train on data with supplied configurations.
+    Train a model with specified configs.
+    This function will first dump the input arguments,
+    then train a model, finally dump reults.
 
     Args:
-        path_data: path to dataset root
-        path_store: path to store weights/results
-        configfilepaths (list[str]): config files absolute paths
-        epochs (int): max epochs
-        early_stop_count: number of epochs to train without improvements in metrics.
-            None(default): to disable the feature
-        checkpoint_freq: interval of checkpoints
+        config (list[str]): configuration file path
+            This option accepts arbitrary number of configs.
+            If a list is specified, the first one is considered
+            as a "main" config, and the other ones will overwrite the content
+        save_path: where to save weights/configs/results
+        data_path (list[str]): path to the data root dir
+        max_steps (int): max training steps
+        early_stop_steps: steps to train without improvements
+            None(default) disables this feature
+        save_freq: interval of checkpoints
             default: 500 steps
-        validate (bool): validate model on validation dataset
-        path_val_data: path to validation data
+        validate: also validate the model on the validation dataset
+        val_data_path (list[str]): path to the validation dataset
+        visualize (bool): should visualize results
+        profile (bool): enable profilling
     '''
-
-    #extract configs from the json file
-    #get train_data using the tf.data.Dataset API interface functions using the path_data and other configs from configfiles
-    #check bool args like validate
-        #make sure path_val_data exists
-        #get val_data again using the tf.data.Dataset API interface function using path_val_data and configs from the configfiles
-    #define a model (use it from another file where model has been defined) and pass the extracted and required configs to the function
-    #results = model.train() with extracted train_ds and other args like max_epochs, early_stop etc
-    #store the train results in path_store_results (maybe pickle?)
-    #return results?
-
-    config = get.get_configs(configfilepaths)
-    store.store_configs(
-        os.path.join(path_save, filename_configs_save),
-        config = config,
-        path_save=path_save,
-        path_data=path_data,
+    config = load.load_config(config)
+    dump.dump_options(
+        os.path.join(save_path, 'options.yaml'),
+        avoid_overwrite=True,
+        config=config,
+        save_path=save_path,
+        data_path=data_path,
     )
-    ds = dataset.train_dataset(path_data,config)
-    
+    ds = dataset.train_ds(data_path, **config['data_options']['train'])
+    if validate:
+        assert val_data_path is not None
+        val_ds = dataset.eval_ds(val_data_path, **config['data_options']['eval'])
+    else: val_ds = None
 
-    
+    if visualize:
+        visualization = {
+            'train': dataset.eval_ds(data_path, **config['data_options']['eval'], include_meta=True),
+            'validation': dataset.eval_ds(val_data_path, **config['data_options']['eval'], include_meta=True),
+        }
+    else: visualization = {}
+
+    #model = engine.TFKerasModel(config)
+    model = vanillacnn.CNN(activation='relu',num_classes=2)
+    model.compile(
+        loss=tf.keras.losses.CategoricalCrossentropy(),
+        metrics=tf.keras.metrics.CategoricalAccuracy(),
+        optimizer=tf.keras.optimizers.Adam(),
+    )
+    results = model.fit(
+        ds,
+        validation_data=val_ds,
+        steps_per_epoch=1,
+        epochs=100,
+        batch_size=16,
+
+    )
+    print(results)
+    return results
+
