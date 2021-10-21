@@ -95,7 +95,6 @@ def train(
         validation_data=val_ds,
         steps_per_epoch=1,
         epochs=100,
-        batch_size=16,
 
     )
     print(results)

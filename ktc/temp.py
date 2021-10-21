@@ -1,4 +1,6 @@
 import os
+
+from tensorflow.python.ops.gen_array_ops import one_hot
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
 
 import tensorflow as tf
@@ -283,7 +285,7 @@ def crop(img, resize_shape, crop_dict):
             'y':crop_dict['y']+(crop_dict['height']//2),
             'x':crop_dict['x']+(crop_dict['width']//2),
     }
-    
+    print("label info: ",crop_dict['labelpath'])
     img = img.numpy()
     (h, w) = resize_shape    
     y1 = tumor_center['y'] - h//2
@@ -291,6 +293,9 @@ def crop(img, resize_shape, crop_dict):
     y2 = tumor_center['y'] + h//2
     x2 = tumor_center['x'] + w//2
     for i in [y1,x1,y2,x2]:
+        if i<=0:
+            print("some information", crop_dict,y1,x1,y2,x2)
+            cv2.imwrite("problem.png",img)
         assert i>0, f'height or width going out of bounds'
     
     img = tf.convert_to_tensor(img, dtype=tf.uint8)
@@ -298,8 +303,8 @@ def crop(img, resize_shape, crop_dict):
     return img
 
 def get_tumor_boundingbox(imgpath, labelpath):
-    (orig_height, orig_width) = cv2.imread(imgpath)[:,:,2].shape
-    image = cv2.imread(labelpath)[:,:,2]
+    (orig_height, orig_width) = cv2.imread(imgpath)[:,:,0].shape
+    image = cv2.imread(labelpath)[:,:,0]
     image = cv2.resize(image, (orig_width, orig_height))
     backup = image.copy()
     lower_red = np.array([220])
@@ -308,6 +313,8 @@ def get_tumor_boundingbox(imgpath, labelpath):
     contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2. CHAIN_APPROX_NONE)
     c = max(contours, key=cv2.contourArea)
     x, y, w, h = cv2.boundingRect(c)
+    backup = backup[y:y+h,x:x+w]
+    cv2.imwrite("problem-1.png",backup)
     crop_info = {
         'y': y,
         'x': x,
@@ -502,7 +509,7 @@ def configure_dataset(dataset, batch_size, buffer_size, repeat=False):
     dataset = dataset.prefetch(tf.data.experimental.AUTOTUNE)
     return dataset
 
-final_dataset = train_dataset(data_root='/home/maanvi/LAB/Datasets/sample_kt',batch_size=4,buffer_size=10,repeat=True,modalities=('am','tm'),output_size=(224,224),aug_configs=None,tumor_region_only=False)
+final_dataset = train_dataset(data_root='/home/maanvi/LAB/Datasets/kidney_tumor_trainvaltest',batch_size=4,buffer_size=10,repeat=True,modalities=('am','tm'),output_size=(224,224),aug_configs=None,tumor_region_only=True)
 
 # final_dataset = train_dataset(data_root='D:/01_Maanvi/LABB/datasets/sample_kt',batch_size=4,buffer_size=10,repeat=True,modalities=('am','tm'),output_size=(224,224),aug_configs=None,tumor_region_only=False)
 

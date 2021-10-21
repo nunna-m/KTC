@@ -453,8 +453,6 @@ def random_brightness(image, label, max_delta):
     return image, label
 
 def random_saturation_img(dataset, lower=5, upper=10):
-    if dataset[0][0].shape[-1] < 3:
-        return dataset
     dataset = dataset.map(
         lambda img, label: random_saturation(img, label,
         lower=lower, upper=upper),
@@ -463,20 +461,22 @@ def random_saturation_img(dataset, lower=5, upper=10):
     return dataset
 
 def random_saturation(image, label, lower, upper):
+    if image.shape[-1]<3:
+        return image, label
     image = tf.image.random_saturation(image,
         lower=lower, upper=upper)
     return image, label
 
 def random_hue_img(dataset, max_delta=0.2):
-    if dataset[0][0].shape[-1] < 3:
-        return dataset
     dataset = dataset.map(
-        lambda img: tf.image.random_hue(img, max_delta=max_delta),
+        lambda img, label: random_hue(img, label,max_delta=max_delta),
         num_parallel_calls=tf.data.experimental.AUTOTUNE,
     )
     return dataset
 
 def random_hue(image, label, max_delta):
+    if image.shape[-1]<3:
+        return image, label
     image = tf.image.random_hue(image, max_delta=max_delta)
     return image, label
 
@@ -489,23 +489,23 @@ def random_rotation_img(dataset):
 
 def random_rotation(img, label, angle_range=(-5,5),interpolation='bilinear',fill_mode='nearest'):
     angle = tf.random.uniform(shape=[1], minval=angle_range[0], maxval=angle_range[1])
-    img = tfa.image.rotate(img, angle=angle,
+    img = tfa.image.rotate(img, angles=angle,
     interpolation=interpolation,
     fill_mode=fill_mode)
     return img, label
 
 def random_shear_img(dataset, x=(-10,10), y=(-10,10)):
-    x_axis = tf.random.uniform(shape=[1], minval=y[0], maxval=y[1])
-    y_axis = tf.random.uniform(shape=[1], minval=x[0], maxval=x[1])
+    x_axis = tf.random.uniform(shape=(), minval=y[0], maxval=y[1])
+    y_axis = tf.random.uniform(shape=(), minval=x[0], maxval=x[1])
     dataset = dataset.map(
-        lambda img, label: tfa.image.shear_x(img, y_axis, [1]),
-        num_paralell_calls=tf.data.experimental.AUTOTUNE,
-    )
-    dataset = dataset.map(
-        lambda img, label: tfa.image.shear_y(img, x_axis, [1]),
-        num_paralell_calls=tf.data.experimental.AUTOTUNE,
+        lambda img, label: random_shear_x_y(img, label, x_axis=x_axis, y_axis=y_axis)
     )
     return dataset
+
+def random_shear_x_y(image, label, x_axis, y_axis):
+    image = tfa.image.shear_x(image, y_axis, [1])
+    image = tfa.image.shear_y(image, x_axis, [1])
+    return image, label
 
 def configure_dataset(dataset, batch_size, buffer_size, repeat=False):
     dataset = dataset.shuffle(buffer_size)
