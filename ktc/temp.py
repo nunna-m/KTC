@@ -263,7 +263,7 @@ def parse_subject(subject_path, output_size, modalities,tumor_region_only, decod
     if tumor_region_only:
         for modality, names in gathered_modalities_paths.items():
             subject_data[modality] = {
-                os.path.splitext(name)[0]: crop(decoder(os.path.join(subject_path, modality, name))[:, :, 0] ,output_size, get_tumor_boundingbox(os.path.join(subject_path, modality, name),os.path.join(subject_path, modality+'L', name))) for name in names
+                os.path.splitext(name)[0]: get_tumor_boundingbox(os.path.join(subject_path, modality, name),os.path.join(subject_path, modality+'L', name)) for name in names
             } 
     else:
         for modality, names in gathered_modalities_paths.items():
@@ -295,7 +295,6 @@ def crop(img, resize_shape, crop_dict):
     for i in [y1,x1,y2,x2]:
         if i<=0:
             print("some information", crop_dict,y1,x1,y2,x2)
-            cv2.imwrite("problem.png",img)
         assert i>0, f'height or width going out of bounds'
     
     img = tf.convert_to_tensor(img, dtype=tf.uint8)
@@ -303,18 +302,53 @@ def crop(img, resize_shape, crop_dict):
     return img
 
 def get_tumor_boundingbox(imgpath, labelpath):
+    # (orig_height, orig_width) = cv2.imread(imgpath)[:,:,0].shape
+    # image = cv2.imread(labelpath)[:,:,0]
+    # image = cv2.resize(image, (orig_width, orig_height))
+    # backup = image.copy()
+    # lower_red = np.array([220])
+    # upper_red = np.array([255])
+    # mask = cv2.inRange(image, lower_red, upper_red)
+    # contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2. CHAIN_APPROX_NONE)
+    # c = max(contours, key=cv2.contourArea)
+    # x, y, w, h = cv2.boundingRect(c)
+    # backup = backup[y:y+h,x:x+w]
+
+    orig_image = cv2.imread(imgpath)[:,:,0]
     (orig_height, orig_width) = cv2.imread(imgpath)[:,:,0].shape
-    image = cv2.imread(labelpath)[:,:,0]
+    image = cv2.imread(labelpath)
     image = cv2.resize(image, (orig_width, orig_height))
     backup = image.copy()
-    lower_red = np.array([220])
-    upper_red = np.array([255])
+    lower_red = np.array([0,0,50])
+    upper_red = np.array([0,0,255])
     mask = cv2.inRange(image, lower_red, upper_red)
     contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2. CHAIN_APPROX_NONE)
     c = max(contours, key=cv2.contourArea)
     x, y, w, h = cv2.boundingRect(c)
-    backup = backup[y:y+h,x:x+w]
-    cv2.imwrite("problem-1.png",backup)
+    backup = orig_image[y:y+h,x:x+w]
+    backup = cv2.resize(backup, (224,224),interpolation = cv2.INTER_LANCZOS4)
+    backup = tf.convert_to_tensor(backup, dtype=tf.uint8)
+    return backup
+
+    #read images
+    # index=0
+    # init = cv2.imread(imgpath)
+    # image = cv2.imread(imgpath)[:,:,index]
+    # image_label = cv2.resize(cv2.imread(labelpath), (image.shape[1],image.shape[0]))[:,:,index]
+
+
+    # thresh = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
+    # x,y,w,h = cv2.boundingRect(thresh)
+    # otsu = image_label[y:y+h,x:x+w]
+    # #cv2.imwrite(storepath+'otsu_image.png',otsu)
+
+
+    # lower = np.array([0], np.uint8)
+    # upper = np.array([0], np.uint8)
+    # mask = cv2.inRange(otsu, lower, upper)
+    # contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2. CHAIN_APPROX_NONE)
+    # c = max(contours, key=cv2.contourArea)
+    # x, y, w, h = cv2.boundingRect(c)
     crop_info = {
         'y': y,
         'x': x,

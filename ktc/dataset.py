@@ -273,7 +273,7 @@ def parse_subject(subject_path, output_size, modalities,tumor_region_only, decod
     if tumor_region_only:
         for modality, names in gathered_modalities_paths.items():
             subject_data[modality] = {
-                os.path.splitext(name)[0]: crop(decoder(os.path.join(subject_path, modality, name))[:, :, 0] ,output_size, get_tumor_boundingbox(os.path.join(subject_path, modality, name),os.path.join(subject_path, modality+'L', name))) for name in names
+                os.path.splitext(name)[0]: get_tumor_boundingbox(os.path.join(subject_path, modality, name),os.path.join(subject_path, modality+'L', name)) for name in names
             } 
     else:
         for modality, names in gathered_modalities_paths.items():
@@ -310,24 +310,21 @@ def crop(img, resize_shape, crop_dict):
     return img
 
 def get_tumor_boundingbox(imgpath, labelpath):
-    (orig_height, orig_width) = cv2.imread(imgpath)[:,:,2].shape
-    image = cv2.imread(labelpath)[:,:,2]
+    orig_image = cv2.imread(imgpath)[:,:,0]
+    (orig_height, orig_width) = cv2.imread(imgpath)[:,:,0].shape
+    image = cv2.imread(labelpath)
     image = cv2.resize(image, (orig_width, orig_height))
     backup = image.copy()
-    lower_red = np.array([220])
-    upper_red = np.array([255])
+    lower_red = np.array([0,0,50])
+    upper_red = np.array([0,0,255])
     mask = cv2.inRange(image, lower_red, upper_red)
     contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2. CHAIN_APPROX_NONE)
     c = max(contours, key=cv2.contourArea)
     x, y, w, h = cv2.boundingRect(c)
-    crop_info = {
-        'y': y,
-        'x': x,
-        'height': h,
-        'width': w,
-        'labelpath':labelpath,
-    }
-    return crop_info
+    backup = orig_image[y:y+h,x:x+w]
+    backup = cv2.resize(backup, (224,224),interpolation = cv2.INTER_LANCZOS4)
+    backup = tf.convert_to_tensor(backup, dtype=tf.uint8)
+    return backup
 
 def parse_aug_configs(configs, default_configs=None):
     if default_configs is None:
