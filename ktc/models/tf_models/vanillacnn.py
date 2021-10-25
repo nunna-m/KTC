@@ -12,7 +12,6 @@ from tensorflow.keras import layers
 from tensorflow.keras.layers import Layer
 from tensorflow.keras import Model
 from tensorflow.python.keras.layers.advanced_activations import Softmax
-
 # customs
 from . import components
 
@@ -43,7 +42,7 @@ class CNN(Model):
 
         # GAP, followed by Classifier
         self.gap   = layers.GlobalAveragePooling2D()
-        self.dense = layers.Dense(num_classes, activation='softmax')
+        self.dense = layers.Dense(num_classes, activation='sigmoid')
     
     @tf.function
     def call(self, input_tensor, training=False):
