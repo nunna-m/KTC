@@ -1,11 +1,31 @@
+
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
+
 import tensorflow as tf
-from tensorflow import keras
 from tensorflow.keras import layers
-from tensorflow.keras.layers import Layer
-from tensorflow.keras import Model
-from tensorflow.python.keras.layers.advanced_activations import Softmax
-from tensorflow.keras.applications import vgg16, ResNet50
+from tensorflow.keras.applications.vgg16 import VGG16
+from tensorflow.keras.layers import *
+from tensorflow.keras import backend as K
+import numpy as np
 
 
-vgg = vgg16.VGG16(weights='imagenet',include_top=False)
-print(vgg.summary())
+X = np.random.randint(0,10, (100,4,4,2))
+Y = np.random.uniform(0,1, (100,20,5))
+
+myarr = np.ones((1, 4,4,2)).astype('float32')
+myconst = tf.convert_to_tensor(myarr)
+
+def repeat_const(tensor, myconst):
+    shapes = tf.shape(tensor)
+    return tf.repeat(myconst, shapes[0], axis=0)
+
+inputs = tf.keras.layers.Input((4,4,2))
+#x = tf.keras.layers.Embedding(10,4,4,2)(inputs)
+x=inputs
+xx = tf.keras.layers.Lambda(lambda x: repeat_const(x, myconst))(x)
+x = tf.keras.layers.Concatenate(axis=-1)([x, xx])
+model = tf.keras.models.Model(inputs=inputs, outputs=x)
+model.compile('adam', 'mse')
+print(model.summary())
+#model.fit(X, Y, epochs=3)

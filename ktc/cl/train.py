@@ -26,7 +26,7 @@ import yaml
 # customs
 from ktc.utils import get, store, load, dump
 from ktc import dataset, engine
-from ktc.models.tf_models import vanillacnn
+from ktc.models.tf_models import transfer_models, vanillacnn
 
 def train(
     config,
@@ -84,19 +84,35 @@ def train(
     else: visualization = {}
 
     #model = engine.TFKerasModel(config)
-    model = vanillacnn.CNN(activation='relu',num_classes=2)
-    model.compile(
-        loss=tf.keras.losses.CategoricalCrossentropy(),
-        metrics=tf.keras.metrics.CategoricalAccuracy(),
-        optimizer=tf.keras.optimizers.Adam(),
-    )
-    results = model.fit(
-        ds,
-        validation_data=val_ds,
-        steps_per_epoch=1,
-        epochs=100,
+    # model = vanillacnn.CNN(activation='relu',num_classes=2)
+    # model.compile(
+    #     loss=tf.keras.losses.CategoricalCrossentropy(),
+    #     metrics=tf.keras.metrics.CategoricalAccuracy(),
+    #     optimizer=tf.keras.optimizers.Adam(),
+    # )
+    # results = model.fit(
+    #     ds,
+    #     validation_data=val_ds,
+    #     steps_per_epoch=1,
+    #     epochs=100,
 
-    )
-    print(results)
+    # )
+    # print(results)
+    model = transfer_models.mobile_net()
+    base_learning_rate = 0.0001
+    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=base_learning_rate),
+                loss=tf.keras.losses.BinaryCrossentropy(from_logits=True),
+                metrics=['accuracy'])
+    print(model.summary())
+    # results = model.fit(
+    #     ds,
+    #     validation_data=val_ds,
+    #     steps_per_epoch=1,
+    #     epochs=100,
+
+    # )
+    # print(results)
+    results = None
+
     return results
 
