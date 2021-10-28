@@ -72,8 +72,8 @@ def train(
     )
     ds = dataset.train_ds(data_path, **config['data_options']['train'])
     if validate:
-        assert val_data_path is not None
-        val_ds = dataset.eval_ds(val_data_path, **config['data_options']['eval'])
+        #assert val_data_path is not None
+        val_ds = dataset.eval_ds(data_path, **config['data_options']['eval'])
     else: val_ds = None
 
     if visualize:
@@ -102,17 +102,18 @@ def train(
     base_learning_rate = 0.0001
     model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=base_learning_rate),
                 loss=tf.keras.losses.BinaryCrossentropy(from_logits=True),
-                metrics=['accuracy'])
-    print(model.summary())
-    # results = model.fit(
-    #     ds,
-    #     validation_data=val_ds,
-    #     steps_per_epoch=1,
-    #     epochs=100,
+                metrics=tf.keras.metrics.BinaryAccuracy())
+    #input_shape = (None, 224, 224, 3)
+    #model.build(input_shape)      
+    #print(model.summary())
+    results = model.fit(
+        ds,
+        validation_data=val_ds,
+        steps_per_epoch=1,
+        epochs=200,
 
-    # )
-    # print(results)
-    results = None
+    )
+    print(results)
 
     return results
 

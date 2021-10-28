@@ -24,7 +24,7 @@ class CNN(Model):
         dropout=None,
         trainable=True,
         activation='relu',
-        num_classes=2,
+        num_classes=1,
         **kargs,
     ):
         super().__init__(**kargs)

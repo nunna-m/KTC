@@ -72,19 +72,11 @@ def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,2
     training_subject_paths = glob.glob(os.path.join(traindir,*'*'*2))
     #print(training_subject_paths)
     ds = tf.data.Dataset.from_tensor_slices(training_subject_paths)
-    i = 0
-    for ele in ds.as_numpy_iterator():
-        if i<100:
-            print(i, ele)
-            i+=1
-    # label_ds = ds.interleave(
-    #         lambda subject_path: tf.data.Dataset.from_generator
-    #         (
-    #             get_label, args=(subject_path,modalities[0],),output_signature=(tf.TensorSpec(shape=(None, ), dtype=tf.int32))
-    #         ),
-    #         cycle_length=count(ds),
-    #         num_parallel_calls=tf.data.experimental.AUTOTUNE,
-    #     )
+    # i = 0
+    # for ele in ds.as_numpy_iterator():
+    #     if i<100:
+    #         print(i, ele)
+    #         i+=1
     label_ds = ds.interleave(
             partial(
                 tf_combine_labels,
@@ -96,7 +88,6 @@ def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,2
             num_parallel_calls=tf.data.experimental.AUTOTUNE,
         )
     
-    #label_ds = label_ds.map(convert_one_hot)
     feature_ds = ds.interleave(
             partial(
                 tf_combine_modalities,
@@ -106,7 +97,6 @@ def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,2
                 return_type='dataset',
             ),
             cycle_length=count(ds),
-            #cycle_length=1,
             num_parallel_calls=tf.data.experimental.AUTOTUNE,
         )
     
@@ -124,9 +114,10 @@ def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,2
     i = 0
     for ele in ds.as_numpy_iterator():
         if i<100:
-            print(i, ele[0].shape, ele[1])
+            print(i, ele[0].shape[:-1], ele[1])
             i+=1
-    ds = ds.map(lambda image, label: tf_reshape_cast_normalize(image, label, num_mod=len(modalities), dtype=dtype), tf.data.experimental.AUTOTUNE)
+    norm = 3
+    ds = ds.map(lambda image, label: tf_reshape_cast_normalize(image, label, num_mod=norm, dtype=dtype), tf.data.experimental.AUTOTUNE)
     
     
     return ds
@@ -136,7 +127,6 @@ def convert_one_hot(label):
     return label
 
 def tf_reshape_cast_normalize(image, label, num_mod, dtype):
-    #print("in tf_reshape: ",image.shape)
     image = tf.reshape(image, [*image.shape[:-1], num_mod])
     image = tf.cast(image, dtype=dtype)
     image = (image / 255.0)
@@ -164,7 +154,6 @@ def get_label(subject, modality):
         pass
     elif isinstance(subject, tf.Tensor): 
         subject = subject.numpy().decode()
-        #modality = modality.numpy().decode()
     else: raise NotImplementedError
     clas, _ = get_class_ID_subjectpath(subject)
     required_path = os.path.join(subject, modality)
@@ -172,15 +161,11 @@ def get_label(subject, modality):
     num_slices = tf.constant([num], tf.int32)
     if clas=='AML':
         label = tf.constant([0], tf.int32)
-        #label = 0
     elif clas=='CCRCC':
         label = tf.constant([1], tf.int32)
-        #label = 1
-    #label = tf.one_hot(label, 2, axis=0, dtype=tf.int32)
     final = tf.tile(label, num_slices)
     print("labels in get_label: ",final.numpy())
     return final
-    #yield final
 
 def tf_combine_modalities(subject_path, output_size, modalities, tumor_region_only,return_type='array'):
     return_type  =return_type.lower()
@@ -208,8 +193,23 @@ def combine_modalities(subject, output_size, modalities, tumor_region_only):
     slice_names = subject_data[modalities[0]].keys()
     
     slices = tf.stack([tf.stack([subject_data[type_][slice_] for type_ in modalities], axis=-1) for slice_ in slice_names])
-    #labels = get_label(subject,modalities[0])
-    print("Slices in combine mods: ",slices.shape)
+    # if subject_data['flag']==1:
+    #     
+    #     slices = tf.stack([slices,zeros],axis=-1)
+
+    # slices = []
+    # for slice_ in slice_names:
+    #     modals = []
+    #     for type_ in modalities:
+    #         img = subject_data[type_][slice_]
+    #         modals.append(img)
+    #     modals = tf.stack(modals, axis=-1)
+    #     if len(modalities)<3:
+    #         zeros = tf.zeros((img.shape[0],img.shape[1],1),dtype=tf.uint8)
+    #     modals = tf.concat([modals,zeros], axis=-1)
+    #     slices.append(modals)
+    # slices = tf.stack(slices, axis=0)
+    print("Slices in combine mods: ",slices.shape[:-1])
     #return slices, labels
     return dict(
         slices=slices,
@@ -239,6 +239,7 @@ def parse_subject(subject_path, output_size, modalities,tumor_region_only, decod
             filter(lambda x: os.path.splitext(x)[0],
             gathered_modalities_paths[modality])
         )
+        
     subject_data['num_slices_per_modality']=len(same_named_slices)
 
     def image_decoder(decode_func):
@@ -270,6 +271,7 @@ def parse_subject(subject_path, output_size, modalities,tumor_region_only, decod
             subject_data[modality] = {
                 os.path.splitext(name)[0]: resize(decoder(os.path.join(subject_path, modality, name))[:, :, 0], output_size)for name in names
             }
+    
     return subject_data
 
 def get_class_ID_subjectpath(subject):
@@ -285,7 +287,7 @@ def crop(img, resize_shape, crop_dict):
             'y':crop_dict['y']+(crop_dict['height']//2),
             'x':crop_dict['x']+(crop_dict['width']//2),
     }
-    print("label info: ",crop_dict['labelpath'])
+    #print("label info: ",crop_dict['labelpath'])
     img = img.numpy()
     (h, w) = resize_shape    
     y1 = tumor_center['y'] - h//2

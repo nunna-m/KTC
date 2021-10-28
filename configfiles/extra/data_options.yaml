@@ -4,14 +4,9 @@ data_options:
         buffer_size: 1024
         output_size: [224, 224]
         modalities: ['am','tm']
-        tumor_region_only: True
+        tumor_region_only: False
         aug_configs:
             random_horizontalflip:
-            random_verticalflip:
-            random_brightness:
-            random_hue:
-            random_saturation:
-            random_rotation:
             
     eval:
         batch_size: 64
