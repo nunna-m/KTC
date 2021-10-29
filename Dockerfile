@@ -3,5 +3,6 @@ RUN apt update
 RUN apt install -y git
 RUN git clone https://github.com/nunna-m/KidneyTumorClassification
 WORKDIR KidneyTumorClassification
+RUN pip3 install -r requirements.txt
 RUN echo $(ls -1 /KidneyTumorClassification/ktc)
 RUN bash /KidneyTumorClassification/ktc/script_tvt_remote.sh
