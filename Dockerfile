@@ -3,5 +3,4 @@ RUN apt update
 RUN apt install -y git
 RUN git clone https://github.com/nunna-m/KidneyTumorClassification
 WORKDIR KidneyTumorClassification
-RUN cd ktc
-RUN bash script_tvt_remote.sh
+RUN bash ktc/script_tvt_remote.sh
