@@ -13,7 +13,7 @@ os:
     data_root:
       /kw_resources/datasets/kidney_tumor
     after_split_path:
-      /kw_resources/datasets/kidney_tumor_trainvaltest
+      /kw_resources/datasets/kt_trainvaltest
 
 trainvaltest_percentages:
   train: 0.7
