@@ -1,1 +1,16 @@
+connected-components-3d
+tensorflow==2.4.0
+tensorflow-addons
+matplotlib
+numpy==1.19.2
+protobuf
+regex
+pandas
+tqdm
+opencv-python
 git+https://github.com/yoshihikoueno/dsargparse.git@master
+p_tqdm
+pyyaml
+tensorboard_plugin_profile
+ruamel.yaml
+scipy
