@@ -4,7 +4,7 @@ import os
 import dsargparse
 
 
-from pre import trainvaltest
+from . import trainvaltest
 
 def main(prog='python3 -m ktc.pre'):
     parser = dsargparse.ArgumentParser(main=main, prog=prog)
