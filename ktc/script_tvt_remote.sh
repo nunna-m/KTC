@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 python3 -m pre split --whichos remote --path ktc/pre/paths.yaml --modalities ['am']
 # python3 -m pre split --whichos remote --path ktc/pre/paths.yaml --modalities ['tm']
 # python3 -m pre split --whichos remote --path ktc/pre/paths.yaml --modalities ['dc']
