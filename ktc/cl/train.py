@@ -98,19 +98,21 @@ def train(
 
     # )
     # print(results)
-    model = transfer_models.mobile_net()
+    model = transfer_models.vgg16_net(classifier_neurons=2)
     base_learning_rate = 0.0001
-    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=base_learning_rate),
-                loss=tf.keras.losses.BinaryCrossentropy(from_logits=True),
-                metrics=tf.keras.metrics.BinaryAccuracy())
-    #input_shape = (None, 224, 224, 3)
-    #model.build(input_shape)      
-    #print(model.summary())
+    # model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=base_learning_rate),
+    #             loss=tf.keras.losses.BinaryCrossentropy(from_logits=True),
+    #             metrics=tf.keras.metrics.BinaryAccuracy())
+    model.compile(
+        loss=tf.keras.losses.CategoricalCrossentropy(),
+        metrics=tf.keras.metrics.CategoricalAccuracy(),
+        optimizer=tf.keras.optimizers.Adam(learning_rate=base_learning_rate,),
+    )
     results = model.fit(
         ds,
         validation_data=val_ds,
         steps_per_epoch=1,
-        epochs=200,
+        epochs=100,
 
     )
     print(results)

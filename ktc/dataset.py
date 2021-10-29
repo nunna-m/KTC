@@ -102,7 +102,7 @@ def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,2
             #cycle_length=1,
             num_parallel_calls=tf.data.experimental.AUTOTUNE,
         )
-    #label_ds = label_ds.map(convert_one_hot)
+    label_ds = label_ds.map(convert_one_hot)
     feature_ds = ds.interleave(
             partial(
                 tf_combine_modalities,
@@ -230,8 +230,9 @@ def combine_modalities(subject, output_size, modalities, tumor_region_only):
             modals.append(img)
         modals = tf.stack(modals, axis=-1)
         if len(modalities)<3:
-            zeros = tf.zeros((img.shape[0],img.shape[1],1),dtype=tf.uint8)
-        modals = tf.concat([modals,zeros], axis=-1)
+            diff = 3-len(modalities)
+            zeros = tf.zeros((img.shape[0],img.shape[1],diff),dtype=tf.uint8)
+            modals = tf.concat([modals,zeros], axis=-1)
         slices.append(modals)
     slices = tf.stack(slices, axis=0)
 

@@ -1,15 +1,15 @@
 data_options:
     train:
-        batch_size: 8
+        batch_size: 16
         buffer_size: 1024
         output_size: [224, 224]
-        modalities: ['am','tm']
-        tumor_region_only: False
+        modalities: ['dc','pc','ec']
+        tumor_region_only: True
         aug_configs:
             random_horizontalflip:
             
     eval:
-        batch_size: 64
+        batch_size: 16
         output_size: [224, 224]
-        modalities: ['am','tm']
-        tumor_region_only: False
+        modalities: ['dc','pc','ec']
+        tumor_region_only: True

@@ -119,6 +119,7 @@ class vgg16_net(Model):
     def __init__(
         self,
         activation='relu',
+        classifier_neurons=1,
         **kargs,
     ):
         super().__init__(**kargs)
@@ -129,7 +130,7 @@ class vgg16_net(Model):
         self.dense1 = layers.Dense(512, activation=activation)
         self.dropout = layers.Dropout(0.5)
         self.dense2 = layers.Dense(256, activation=activation)
-        self.dense3 = layers.Dense(1, activation='sigmoid')
+        self.dense3 = layers.Dense(classifier_neurons, activation='sigmoid')
         
     
     @tf.function
@@ -137,7 +138,7 @@ class vgg16_net(Model):
         x = self.base_model(input_tensor)
         x = self.flatten(x)
         x = self.dense1(x)
-        x = self.dropout(x)
+        #x = self.dropout(x)
         x = self.dense2(x)
         x = self.dense3(x)
         return x
