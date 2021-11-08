@@ -1,4 +1,5 @@
 import os
+from numpy.lib.function_base import diff
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
 
 import tensorflow as tf
@@ -25,19 +26,28 @@ c = max(contours, key=cv2.contourArea)
 x, y, w, h = cv2.boundingRect(c)
 assert (w,h)<(224,224)
 assert (x,y)>=(0,0)
-width_thresh = (orig_width//2)
-height_thresh = (orig_height//2)
+const = 0.3
+diff_x = int(const*w)
+diff_y = int(const*h)
+if (x-diff_x)<0:
+    x1 = 0
+else:
+    x1 = x-diff_x
+if (y-diff_y)<0:
+    y1 = 0
+else:
+    y1 = y-diff_y
+if (x+w+diff_x)>=orig_width:
+    x2 = orig_width
+else:
+    x2 = x+diff_x+w
+if (y+diff_y+h)>=orig_height:
+    y2 = orig_height
+else:
+    y2 = y+diff_y+h
 
-# if (x<width_thresh) and y<(height_thresh):
-#     #tumor region in top left quadrant
-#     backup = orig_image[y:y+224,x:x+224]
-# elif (x>=width_thresh) and y<(height_thresh):
-#     #tumor region in top right quadrant
-#     diff = (width_thresh-x)//2
-#     backup = orig_image[y:y+224,x-(224//2):x+()]
-
-backup = orig_image[y:y+h,x:x+w]
+backup = orig_image[y1:y2,x1:x2]
 backup = cv2.resize(backup, (224,224),interpolation = cv2.INTER_LINEAR)
-cv2.imwrite(storepath+'_cropped.png',backup)
+cv2.imwrite(storepath+'_cropped_new_0.3.png',backup)
 
 

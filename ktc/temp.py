@@ -192,24 +192,24 @@ def combine_modalities(subject, output_size, modalities, tumor_region_only):
     subject_data = parse_subject(subject, output_size, modalities=modalities, tumor_region_only=tumor_region_only)
     slice_names = subject_data[modalities[0]].keys()
     
-    slices = tf.stack([tf.stack([subject_data[type_][slice_] for type_ in modalities], axis=-1) for slice_ in slice_names])
-    # if subject_data['flag']==1:
-    #     
-    #     slices = tf.stack([slices,zeros],axis=-1)
-
-    # slices = []
-    # for slice_ in slice_names:
-    #     modals = []
-    #     for type_ in modalities:
-    #         img = subject_data[type_][slice_]
-    #         modals.append(img)
-    #     modals = tf.stack(modals, axis=-1)
-    #     if len(modalities)<3:
-    #         zeros = tf.zeros((img.shape[0],img.shape[1],1),dtype=tf.uint8)
-    #     modals = tf.concat([modals,zeros], axis=-1)
-    #     slices.append(modals)
-    # slices = tf.stack(slices, axis=0)
-    print("Slices in combine mods: ",slices.shape[:-1])
+    # slices = tf.stack([tf.stack([subject_data[type_][slice_] for type_ in modalities], axis=-1) for slice_ in slice_names])
+    slices = []
+    for slice_ in slice_names:
+        modals = []
+        for type_ in modalities:
+            img = subject_data[type_][slice_]
+            modals.append(img)
+        modals = tf.stack(modals, axis=-1)
+        if len(modalities)<3:
+            diff = 3-len(modalities)
+            if len(modalities)==2:
+                zeros = tf.zeros((img.shape[0],img.shape[1],diff),dtype=tf.uint8)
+                modals = tf.concat([modals,zeros], axis=-1)
+            elif len(modalities)==1:
+                modals = tf.repeat(modals, repeats=[diff],axis=-1)
+        slices.append(modals)
+    slices = tf.stack(slices, axis=0)
+    print("Slices in combine mods: ",slices.shape)
     #return slices, labels
     return dict(
         slices=slices,

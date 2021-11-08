@@ -61,6 +61,7 @@ def train_ds(
     )
     print("Final dataset:  ",dataset)
     return dataset
+
 def eval_ds(
     data_root,
     batch_size,
@@ -80,10 +81,10 @@ def eval_ds(
     ds = ds.prefetch(tf.data.experimental.AUTOTUNE)
     return ds
 
-def predict_ds(data_root, modalities):
-    testdir = os.path.join(data_root,'_'.join(modalities),'eval')
-    ds = load_raw(testdir,modalities=modalities)
-    ds = ds.batch(1)
+def predict_ds(data_root, batch_size, modalities,output_size=(224,224),tumor_region_only=False):
+    testdir = os.path.join(data_root[0],'_'.join(modalities),'test')
+    ds = load_raw(testdir,modalities=modalities, output_size=output_size, tumor_region_only=tumor_region_only)
+    ds = ds.batch(batch_size)
     return ds
 
 def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,224), tumor_region_only=False, dtype=tf.float32):
@@ -99,7 +100,6 @@ def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,2
                 return_type='dataset',
             ),
             cycle_length=count(ds),
-            #cycle_length=1,
             num_parallel_calls=tf.data.experimental.AUTOTUNE,
         )
     label_ds = label_ds.map(convert_one_hot)
@@ -112,7 +112,6 @@ def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,2
                 return_type='dataset',
             ),
             cycle_length=count(ds),
-            #cycle_length=1,
             num_parallel_calls=tf.data.experimental.AUTOTUNE,
         )
     
@@ -125,12 +124,6 @@ def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,2
             ),
             tf.data.experimental.AUTOTUNE,
         )
-
-    # if output_size is not None: feature_ds = feature_ds.map(
-    #         lambda image: image,
-    #         tf.data.experimental.AUTOTUNE,
-    #     )
-
     ds = tf.data.Dataset.zip((feature_ds, label_ds))
     norm = 3
     ds = ds.map(lambda image, label: tf_reshape_cast_normalize(image, label, num_mod=norm, dtype=dtype), tf.data.experimental.AUTOTUNE)
@@ -231,13 +224,13 @@ def combine_modalities(subject, output_size, modalities, tumor_region_only):
         modals = tf.stack(modals, axis=-1)
         if len(modalities)<3:
             diff = 3-len(modalities)
-            zeros = tf.zeros((img.shape[0],img.shape[1],diff),dtype=tf.uint8)
-            modals = tf.concat([modals,zeros], axis=-1)
+            if len(modalities)==2:
+                zeros = tf.zeros((img.shape[0],img.shape[1],diff),dtype=tf.uint8)
+                modals = tf.concat([modals,zeros], axis=-1)
+            elif len(modalities)==1:
+                modals = tf.repeat(modals, repeats=[3],axis=-1)
         slices.append(modals)
     slices = tf.stack(slices, axis=0)
-
-    # slices = tf.stack([tf.stack([subject_data[type_][slice_] for type_ in modalities], axis=-1) for slice_ in slice_names])
-
 
     return dict(
         slices=slices,
@@ -340,18 +333,27 @@ def get_tumor_boundingbox(imgpath, labelpath):
     x, y, w, h = cv2.boundingRect(c)
     assert (w,h)<(224,224)
     assert (x,y)>=(0,0)
-    width_thresh = (orig_width//2)
-    height_thresh = (orig_height//2)
-    
-    # if (x<width_thresh) and y<(height_thresh):
-    #     #tumor region in top left quadrant
-    #     backup = orig_image[y:y+224,x:x+224]
-    # elif (x>=width_thresh) and y<(height_thresh):
-    #     #tumor region in top right quadrant
-    #     diff = (width_thresh-x)//2
-    #     backup = orig_image[y:y+224,x-(224//2):x+()]
+    const = 0.3
+    diff_x = int(const*w)
+    diff_y = int(const*h)
+    if (x-diff_x)<0:
+        x1 = 0
+    else:
+        x1 = x-diff_x
+    if (y-diff_y)<0:
+        y1 = 0
+    else:
+        y1 = y-diff_y
+    if (x+w+diff_x)>=orig_width:
+        x2 = orig_width
+    else:
+        x2 = x+diff_x+w
+    if (y+diff_y+h)>=orig_height:
+        y2 = orig_height
+    else:
+        y2 = y+diff_y+h
 
-    backup = orig_image[y:y+h,x:x+w]
+    backup = orig_image[y1:y2,x1:x2]
     backup = cv2.resize(backup, (224,224),interpolation = cv2.INTER_LINEAR)
     backup = tf.convert_to_tensor(backup, dtype=tf.uint8)
     return backup

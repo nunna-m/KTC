@@ -105,7 +105,10 @@ def train(
     #             metrics=tf.keras.metrics.BinaryAccuracy())
     model.compile(
         loss=tf.keras.losses.CategoricalCrossentropy(),
-        metrics=tf.keras.metrics.CategoricalAccuracy(),
+        metrics=[tf.keras.metrics.CategoricalAccuracy(),
+        tf.keras.metrics.AUC(),
+        tf.keras.metrics.Recall(),
+        tf.keras.metrics.Precision(),],
         optimizer=tf.keras.optimizers.Adam(learning_rate=base_learning_rate,),
     )
     results = model.fit(
@@ -115,7 +118,17 @@ def train(
         epochs=100,
 
     )
-    print(results)
+    
+    dump.dump_train_results(
+        os.path.join(save_path, 'results.pkl'),
+        results,
+        format_='pickle',
+    )
+
+    #predict
+    test_ds = dataset.predict_ds(data_path, **config['data_options']['test'])
+
+    print("test loss, test acc: ",model.evaluate(test_ds))
 
     return results
 
