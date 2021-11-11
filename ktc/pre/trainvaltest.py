@@ -37,7 +37,7 @@ def split(whichos, path, modalities):
     for clas in classes:
         classwise_subjects[clas] = os.listdir(os.path.join(dataset_path,clas))
         counts, classwise_subjects[clas] = get_slicetypecount_subjects(dataset_path, modalities, counts, clas, classwise_subjects[clas])
-        create_train_val_test_folders(new_path,clas,classwise_subjects[clas],trainvaltest_percentages)
+        create_train_val_test_folders(new_path,clas,classwise_subjects[clas],trainvaltest_percentages, modalities)
 
     print("done generating {} split folders".format('_'.join(modalities)))
     return 
@@ -90,7 +90,7 @@ def get_slicetypecount_subjects(dataset_path,modalities, counts, clas, folders):
             subject_list.append(folder_path)
     return counts, subject_list
 
-def create_train_val_test_folders(path, clas, subjects, fractions):
+def create_train_val_test_folders(path, clas, subjects, fractions, modalities):
     '''
     Create train val test folders classification category wise from the whole dataset based on modalities specified in cmd
 
@@ -99,6 +99,7 @@ def create_train_val_test_folders(path, clas, subjects, fractions):
         clas: classification category
         subjects: the paths of subject folders in that class
         fractions (dict): train percentage and validation percentage, passed in through intial configuration file
+        modalities: required modalities for copying
     '''
     train_subjects, val_subjects, test_subjects = get_train_val_test_subjects(fractions['train'], fractions['val'], len(subjects), subjects)
     for subset in ['train','val', 'test']:
@@ -110,7 +111,7 @@ def create_train_val_test_folders(path, clas, subjects, fractions):
             send_subjects = val_subjects
         elif subset == 'test':
             send_subjects = test_subjects
-        copysubjects(send_subjects,newPath)
+        copysubjects(send_subjects,newPath,modalities)
 
 def get_train_val_test_subjects(_train, _val,class_length,subjects):
     '''
@@ -141,14 +142,25 @@ def get_train_val_test_numbers(frac_train,frac_val, length):
     val_length = math.floor(frac_val*length)
     return (train_length, val_length)            
 
-def copysubjects(subjects, path):
+def copysubjects(subjects, path, modalities):
     '''
     Deep copy of folders from full data to train.val.test split folders
     
     Args:
         subjects: paths of subject folders to perform deep copy (basically source)
         path: target path to store the deep copied folders (basically destination)
+        modalities: required modalities for copying
     '''
+    modalities_l = [i+'L' for i in modalities]
+    modalities_l.extend(modalities)
+    #print(path)
     for subject in subjects:
         ID = subject.split(os.path.sep)[-1]
-        shutil.copytree(subject,os.path.join(path,ID))
+        #print("Subject: {} and ID: {}".format(subject,ID))
+        for base, dirs, files in os.walk(subject):
+            if len(dirs)>0:
+                for dir in dirs:
+                    if dir in modalities_l:
+                        old_path = os.path.join(subject, dir)
+                        new_path = os.path.join(path, ID, dir)
+                        shutil.copytree(old_path,new_path)

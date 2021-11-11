@@ -8,7 +8,7 @@ os:
     data_root:
       '/home/maanvi/LAB/Datasets/kt_new'
     after_split_path:
-      '/home/maanvi/LAB/Datasets/kt_new_trainvaltest'
+      '/home/maanvi/LAB/Datasets/kt_temp'
   remote:
     data_root:
       '/kw_resources/datasets/kt_new'
