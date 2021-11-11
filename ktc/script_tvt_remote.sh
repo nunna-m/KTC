@@ -22,7 +22,6 @@ python3 -m ktc.pre split --whichos remote --path ktc/pre/paths.yaml --modalities
 python3 -m ktc.pre split --whichos remote --path ktc/pre/paths.yaml --modalities ['am','tm','dc']
 python3 -m ktc.pre split --whichos remote --path ktc/pre/paths.yaml --modalities ['am','tm','ec']
 python3 -m ktc.pre split --whichos remote --path ktc/pre/paths.yaml --modalities ['am','tm','pc']
-
 python3 -m ktc.pre split --whichos remote --path ktc/pre/paths.yaml --modalities ['am','tm']
 python3 -m ktc.pre split --whichos remote --path ktc/pre/paths.yaml --modalities ['dc','ec','pc']
 python3 -m ktc.pre split --whichos remote --path ktc/pre/paths.yaml --modalities ['am','tm','dc','ec','pc']
