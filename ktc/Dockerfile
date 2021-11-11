@@ -13,5 +13,5 @@ CMD NCCL_DEBUG=WARN NCCL_SHM_DISABLE=1 python3 -m ktc train\
         /kw_resources/results/kidney_tumor\
     --data_path\
         /kw_resources/datasets/kt_new_trainvaltest\
-    --max_steps 100\
+    --max_steps 10\
     --validate
