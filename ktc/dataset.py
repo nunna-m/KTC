@@ -13,6 +13,7 @@ import sys
 import matplotlib.pyplot as plt
 import tensorflow_addons as tfa
 
+TL_num = 3
 
 def train_ds(
     data_root,
@@ -139,7 +140,8 @@ def tf_reshape_cast_normalize(image, label, num_mod, dtype):
     print("in tf_reshape: ",image.shape)
     image = tf.reshape(image, [*image.shape[:-1], num_mod])
     image = tf.cast(image, dtype=dtype)
-    image = (image / 255.0)
+    image = (image / 127.5)
+    image = (image-1)
     #label.set_shape([1])
     return image, label
 

@@ -6,14 +6,14 @@ os:
       'D:\01_Maanvi\LABB\datasets\kidney_tumor_trainvaltest'
   linux:
     data_root:
-      '/home/maanvi/LAB/Datasets/kidney_tumor'
+      '/home/maanvi/LAB/Datasets/kt_new'
     after_split_path:
-      '/home/maanvi/LAB/Datasets/kidney_tumor_trainvaltest'
+      '/home/maanvi/LAB/Datasets/kt_new_trainvaltest'
   remote:
     data_root:
-      '/kw_resources/datasets/kidney_tumor'
+      '/kw_resources/datasets/kt_new'
     after_split_path:
-      '/kw_resources/datasets/kidney_tumor_trainvaltest'
+      '/kw_resources/datasets/kt_new_trainvaltest'
 
 trainvaltest_percentages:
   train: 0.7

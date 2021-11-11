@@ -3,21 +3,22 @@ data_options:
         batch_size: 16
         buffer_size: 1024
         output_size: [224, 224]
-        modalities: ['ec']
+        modalities: ['dc']
         tumor_region_only: True
         aug_configs:
             random_horizontalflip:
             random_verticalflip:
             random_rotation:
+            random_brightness:
                
     eval:
         batch_size: 16
         output_size: [224, 224]
-        modalities: ['ec']
+        modalities: ['dc']
         tumor_region_only: True
 
     test:
         batch_size: 16
         output_size: [224, 224]
-        modalities: ['ec']
+        modalities: ['dc']
         tumor_region_only: True

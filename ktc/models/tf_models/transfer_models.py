@@ -128,7 +128,7 @@ class vgg16_net(Model):
             self.layer.trainable = False
         self.flatten = layers.Flatten()
         self.dense1 = layers.Dense(512, activation=activation)
-        self.dropout = layers.Dropout(0.5)
+        self.dropout = layers.Dropout(0.2)
         self.dense2 = layers.Dense(256, activation=activation)
         self.dense3 = layers.Dense(classifier_neurons, activation='sigmoid')
         
@@ -138,7 +138,7 @@ class vgg16_net(Model):
         x = self.base_model(input_tensor)
         x = self.flatten(x)
         x = self.dense1(x)
-        #x = self.dropout(x)
+        x = self.dropout(x)
         x = self.dense2(x)
         x = self.dense3(x)
         return x

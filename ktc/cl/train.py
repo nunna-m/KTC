@@ -3,6 +3,7 @@ CLI for train command
 '''
 
 import os
+from tensorflow.python.keras.callbacks import LearningRateScheduler
 import yaml
 
 from ktc.utils import get, store, load, dump
@@ -100,6 +101,12 @@ def train(
     # print(results)
     model = transfer_models.vgg16_net(classifier_neurons=2)
     base_learning_rate = 0.0001
+    epochs = 100
+    decay = base_learning_rate / epochs
+
+    def lr_time_based_decay(epoch, lr):
+        return lr * 1 / (1+decay*epoch)
+    
     # model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=base_learning_rate),
     #             loss=tf.keras.losses.BinaryCrossentropy(from_logits=True),
     #             metrics=tf.keras.metrics.BinaryAccuracy())
@@ -115,7 +122,8 @@ def train(
         ds,
         validation_data=val_ds,
         steps_per_epoch=1,
-        epochs=100,
+        epochs=epochs,
+        #callbacks=[LearningRateScheduler(lr_time_based_decay, verbose=1)],
 
     )
     
