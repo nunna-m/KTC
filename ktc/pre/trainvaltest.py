@@ -164,3 +164,9 @@ def copysubjects(subjects, path, modalities):
                         old_path = os.path.join(subject, dir)
                         new_path = os.path.join(path, ID, dir)
                         shutil.copytree(old_path,new_path)
+
+def remove_existing_folder(whichos, path):
+    configs = return_configs_asdict(whichos, path)
+    target_path = configs['os'][whichos]['after_split_path']
+    if os.path.exists(target_path) and os.path.isdir(target_path):
+        shutil.rmtree(target_path)
