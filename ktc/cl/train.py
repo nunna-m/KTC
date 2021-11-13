@@ -140,6 +140,7 @@ def train(
     test_ds = dataset.predict_ds(data_path, **config['data_options']['test'])
 
     print("test loss, test acc: ",model.evaluate(test_ds))
+    print("***********************************RUN DONE ***********************************")
 
     return results
 
