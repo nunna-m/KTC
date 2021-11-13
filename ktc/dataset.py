@@ -17,10 +17,10 @@ TL_num = 3
 
 def train_ds(
     data_root,
+    modalities,
     batch_size,
     buffer_size,
     repeat = True,
-    modalities=('am','tm','dc','ec','pc'),
     output_size=(224,224),
     aug_configs=None,
     tumor_region_only=False,
@@ -41,7 +41,7 @@ def train_ds(
         random_shear_img: {},
     }
     #print("Data_root---------:",data_root)
-    traindir = os.path.join(data_root[0],'_'.join(modalities),'train')
+    traindir = os.path.join(data_root,'_'.join(modalities),'train')
     dataset = load_raw(
         traindir,
         modalities=modalities,
@@ -65,13 +65,13 @@ def train_ds(
 
 def eval_ds(
     data_root,
+    modalities,
     batch_size,
-    modalities=('am','tm','dc','ec','pc'),
     include_meta=False,
     output_size=(224,224),
     tumor_region_only=False,
 ):
-    evaldir = os.path.join(data_root[0],'_'.join(modalities),'val')
+    evaldir = os.path.join(data_root,'_'.join(modalities),'val')
     ds = load_raw(
         evaldir,
         modalities=modalities,
@@ -82,8 +82,12 @@ def eval_ds(
     ds = ds.prefetch(tf.data.experimental.AUTOTUNE)
     return ds
 
-def predict_ds(data_root, batch_size, modalities,output_size=(224,224),tumor_region_only=False):
-    testdir = os.path.join(data_root[0],'_'.join(modalities),'test')
+def predict_ds(data_root,
+         modalities,
+         batch_size,
+         output_size=(224,224),
+         tumor_region_only=False):
+    testdir = os.path.join(data_root,'_'.join(modalities),'test')
     ds = load_raw(testdir,modalities=modalities, output_size=output_size, tumor_region_only=tumor_region_only)
     ds = ds.batch(batch_size)
     return ds

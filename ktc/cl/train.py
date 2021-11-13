@@ -30,9 +30,9 @@ from ktc import dataset, engine
 from ktc.models.tf_models import transfer_models, vanillacnn
 
 def train(
+    whichos,
     config,
-    save_path,
-    data_path,
+    modalities,
     max_steps,
     early_stop_steps=None,
     save_freq=500,
@@ -47,12 +47,12 @@ def train(
     then train a model, finally dump reults.
 
     Args:
+        whichos: operating system linux/windows/remote(docker)
         config (list[str]): configuration file path
             This option accepts arbitrary number of configs.
             If a list is specified, the first one is considered
             as a "main" config, and the other ones will overwrite the content
-        save_path: where to save weights/configs/results
-        data_path (list[str]): path to the data root dir
+        modalities (list[str]): the modalites being used
         max_steps (int): max training steps
         early_stop_steps: steps to train without improvements
             None(default) disables this feature
@@ -64,6 +64,9 @@ def train(
         profile (bool): enable profilling
     '''
     config = load.load_config(config)
+    print("modalities and os: ",modalities, whichos)
+    save_path = config['data_options'][whichos]['save_path']
+    data_path = config['data_options'][whichos]['data_path']
     dump.dump_options(
         os.path.join(save_path, 'options.yaml'),
         avoid_overwrite=True,
@@ -71,16 +74,16 @@ def train(
         save_path=save_path,
         data_path=data_path,
     )
-    ds = dataset.train_ds(data_path, **config['data_options']['train'])
+    ds = dataset.train_ds(data_path, modalities, **config['data_options']['train'])
     if validate:
         #assert val_data_path is not None
-        val_ds = dataset.eval_ds(data_path, **config['data_options']['eval'])
+        val_ds = dataset.eval_ds(data_path, modalities, **config['data_options']['eval'])
     else: val_ds = None
 
     if visualize:
         visualization = {
-            'train': dataset.eval_ds(data_path, **config['data_options']['eval'], include_meta=True),
-            'validation': dataset.eval_ds(val_data_path, **config['data_options']['eval'], include_meta=True),
+            'train': dataset.eval_ds(data_path, modalities, **config['data_options']['eval'], include_meta=True),
+            'validation': dataset.eval_ds(val_data_path, modalities,**config['data_options']['eval'], include_meta=True),
         }
     else: visualization = {}
 

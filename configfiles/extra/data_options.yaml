@@ -1,25 +1,31 @@
 data_options:
+    remote:
+        data_path:
+            /kw_resources/datasets/kt_new_trainvaltest
+        save_path:
+            /kw_resources/results/kidney_tumor
+    linux:
+        data_path:
+            /home/maanvi/LAB/Datasets/kt_new_trainvaltest
+        save_path:
+            /home/maanvi/LAB/results/kidney_tumor
     train:
         batch_size: 16
         buffer_size: 1024
         output_size: [224, 224]
-        modalities: ['dc']
         tumor_region_only: True
         aug_configs:
             random_horizontalflip:
             random_verticalflip:
             random_rotation:
             random_brightness:
-            random_contrast:
                
     eval:
         batch_size: 16
         output_size: [224, 224]
-        modalities: ['dc']
         tumor_region_only: True
 
     test:
         batch_size: 16
         output_size: [224, 224]
-        modalities: ['dc']
         tumor_region_only: True
