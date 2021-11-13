@@ -125,7 +125,7 @@ def train(
         ds,
         validation_data=val_ds,
         steps_per_epoch=1,
-        epochs=epochs,
+        epochs=max_steps,
         #callbacks=[LearningRateScheduler(lr_time_based_decay, verbose=1)],
 
     )
@@ -137,7 +137,7 @@ def train(
     )
 
     #predict
-    test_ds = dataset.predict_ds(data_path, **config['data_options']['test'])
+    test_ds = dataset.predict_ds(data_path, modalities, **config['data_options']['test'])
 
     print("test loss, test acc: ",model.evaluate(test_ds))
     print("***********************************RUN DONE ***********************************")

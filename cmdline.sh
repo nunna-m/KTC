@@ -1,0 +1,1 @@
+python3 -m ktc train --whichos remote --modalities am tm --config "configfiles/extra/data_options.yaml" --max_steps 10 --validate
