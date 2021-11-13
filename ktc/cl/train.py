@@ -3,6 +3,7 @@ CLI for train command
 '''
 
 import os
+from tensorflow.keras import metrics
 from tensorflow.python.keras.callbacks import LearningRateScheduler
 import yaml
 
@@ -22,6 +23,7 @@ from datetime import datetime
 # external
 import tensorflow as tf
 from tensorflow import keras
+from matplotlib import pyplot as plt
 import dsargparse
 import yaml
 import tensorboard as tb
@@ -107,40 +109,52 @@ def train(
 
     # )
     # print(results)
-    model = transfer_models.vgg16_net(classifier_neurons=2)
-    base_learning_rate = 0.0001
+    num_neurons = 1
+    model = transfer_models.vgg16_net(classifier_neurons=num_neurons)
+    base_learning_rate = 0.001
     epochs = 100
     decay = base_learning_rate / epochs
-
+    reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.2,
+                              patience=5, min_lr=0.001)
+    early_stopping = tf.keras.callbacks.EarlyStopping(
+    monitor='val_prc', 
+    verbose=1,
+    patience=10,
+    mode='max',
+    restore_best_weights=True)
     def lr_time_based_decay(epoch, lr):
         return lr * 1 / (1+decay*epoch)
     
-    # model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=base_learning_rate),
-    #             loss=tf.keras.losses.BinaryCrossentropy(from_logits=True),
-    #             metrics=tf.keras.metrics.BinaryAccuracy())
-    model.compile(
-        loss=tf.keras.losses.CategoricalCrossentropy(),
-        metrics=[tf.keras.metrics.CategoricalAccuracy(),
-        tf.keras.metrics.AUC(),
-        tf.keras.metrics.Recall(),
-        tf.keras.metrics.Precision(),],
-        optimizer=tf.keras.optimizers.Adam(learning_rate=base_learning_rate,),
-    )
+    METRICS = [
+      keras.metrics.TruePositives(name='tp'),
+      keras.metrics.FalsePositives(name='fp'),
+      keras.metrics.TrueNegatives(name='tn'),
+      keras.metrics.FalseNegatives(name='fn'), 
+      keras.metrics.BinaryAccuracy(name='accuracy'),
+      keras.metrics.Precision(name='precision'),
+      keras.metrics.Recall(name='recall'),
+      keras.metrics.AUC(name='auc'),
+      keras.metrics.AUC(name='prc', curve='PR'), # precision-recall curve
+    ]
+
+    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=base_learning_rate),
+                loss=tf.keras.losses.BinaryCrossentropy(),
+                metrics=METRICS)
     results = model.fit(
         ds,
         validation_data=val_ds,
         steps_per_epoch=1,
         epochs=max_steps,
-        callbacks = [tensorboard_callback]
+        callbacks = [reduce_lr, tensorboard_callback]
         #callbacks=[LearningRateScheduler(lr_time_based_decay, verbose=1)],
 
     )
     
-    dump.dump_train_results(
-        os.path.join(save_path, 'results.pkl'),
-        results,
-        format_='pickle',
-    )
+    # dump.dump_train_results(
+    #     os.path.join(save_path, 'results.pkl'),
+    #     results,
+    #     format_='pickle',
+    # )
 
     #predict
     test_ds = dataset.predict_ds(data_path, modalities, **config['data_options']['test'])
@@ -148,5 +162,35 @@ def train(
     print("test loss, test acc: ",model.evaluate(test_ds))
     print("{} ***********************************RUN DONE ***********************************".format(modalities))
 
+    plot_metrics(results, save_path, modalities)
+    
     return results
+
+def plot_metrics(history, path, modals):
+    req = history.history
+    if os.path.isdir(path) and os.path.exists(path):
+        savepath = os.path.join(path, 'graphs','_'.join(modals))
+        os.makedirs(savepath, exist_ok=True)
+    
+    #plot training and val loss
+    metric = 'loss'
+    fig = plt.figure()
+    plt.plot(req[metric])
+    plt.plot(req['val_'+metric])
+    plt.title('vgg16 fine tuning model '+metric)
+    plt.xlabel('epoch')
+    plt.legend(['train','val'], loc= 'upper left')
+    plt.savefig(os.path.join(savepath,metric+'.png'))
+    plt.close(fig)
+
+    #plot training and val accuracy
+    # metric = 'categorical_accuracy'
+    # fig2 = plt.figure()
+    # plt.plot(req[metric])
+    # plt.plot(req['val_'+metric])
+    # plt.title('vgg16 fine tuning model '+metric[-8:])
+    # plt.xlabel('epoch')
+    # plt.legend(['train','val'], loc= 'upper left')
+    # plt.savefig(os.path.join(savepath,metric[-8:]+'.png'))
+    # plt.close(fig2)
 

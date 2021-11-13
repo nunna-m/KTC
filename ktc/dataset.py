@@ -107,7 +107,7 @@ def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,2
             cycle_length=count(ds),
             num_parallel_calls=tf.data.experimental.AUTOTUNE,
         )
-    label_ds = label_ds.map(convert_one_hot)
+    #label_ds = label_ds.map(convert_one_hot)
     feature_ds = ds.interleave(
             partial(
                 tf_combine_modalities,

@@ -24,7 +24,7 @@ def train_dataset(
     batch_size,
     buffer_size,
     repeat = True,
-    modalities=('am','tm','dc','ec','pc'),
+    modalities=['am','tm','dc','ec','pc'],
     output_size=(224,224),
     aug_configs=None,
     tumor_region_only=False,
@@ -44,7 +44,6 @@ def train_dataset(
         random_rotation_img: {},
         random_shear_img: {},
     }
-    
     traindir = os.path.join(data_root,'_'.join(modalities),'train')
     dataset = load_raw(
         traindir,
@@ -67,10 +66,8 @@ def train_dataset(
     print("Final dataset:  ",dataset)
     return dataset
 
-def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,224), tumor_region_only=False, dtype=tf.float32):
-    
+def load_raw(traindir, modalities=['am','tm','dc','ec','pc'], output_size=(224,224), tumor_region_only=False, dtype=tf.float32):
     training_subject_paths = glob.glob(os.path.join(traindir,*'*'*2))
-    #print(training_subject_paths)
     ds = tf.data.Dataset.from_tensor_slices(training_subject_paths)
     # i = 0
     # for ele in ds.as_numpy_iterator():
@@ -87,7 +84,7 @@ def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,2
             #cycle_length=1,
             num_parallel_calls=tf.data.experimental.AUTOTUNE,
         )
-    
+    print("LABEL ds: ",label_ds)
     feature_ds = ds.interleave(
             partial(
                 tf_combine_modalities,
@@ -114,7 +111,7 @@ def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,2
     i = 0
     for ele in ds.as_numpy_iterator():
         if i<100:
-            print(i, ele[0].shape[:-1], ele[1])
+            print(i, ele[0].shape, ele[1])
             i+=1
     norm = 3
     ds = ds.map(lambda image, label: tf_reshape_cast_normalize(image, label, num_mod=norm, dtype=dtype), tf.data.experimental.AUTOTUNE)
@@ -164,7 +161,7 @@ def get_label(subject, modality):
     elif clas=='CCRCC':
         label = tf.constant([1], tf.int32)
     final = tf.tile(label, num_slices)
-    print("labels in get_label: ",final.numpy())
+    #print("labels in get_label: ",final.numpy())
     return final
 
 def tf_combine_modalities(subject_path, output_size, modalities, tumor_region_only,return_type='array'):
@@ -209,7 +206,8 @@ def combine_modalities(subject, output_size, modalities, tumor_region_only):
                 modals = tf.repeat(modals, repeats=[diff],axis=-1)
         slices.append(modals)
     slices = tf.stack(slices, axis=0)
-    print("Slices in combine mods: ",slices.shape)
+    print(subject_data['subject_path'])
+    #print("Slices in combine mods: ",slices.shape)
     #return slices, labels
     return dict(
         slices=slices,
@@ -545,7 +543,7 @@ def configure_dataset(dataset, batch_size, buffer_size, repeat=False):
     dataset = dataset.prefetch(tf.data.experimental.AUTOTUNE)
     return dataset
 
-final_dataset = train_dataset(data_root='/home/maanvi/LAB/Datasets/kidney_tumor_trainvaltest',batch_size=4,buffer_size=10,repeat=True,modalities=('am','tm'),output_size=(224,224),aug_configs=None,tumor_region_only=True)
+final_dataset = train_dataset(data_root='/home/maanvi/LAB/Datasets/sample_kt',batch_size=4,buffer_size=10,repeat=True,modalities=['dc'],output_size=(224,224),aug_configs=None,tumor_region_only=True)
 
 # final_dataset = train_dataset(data_root='D:/01_Maanvi/LABB/datasets/sample_kt',batch_size=4,buffer_size=10,repeat=True,modalities=('am','tm'),output_size=(224,224),aug_configs=None,tumor_region_only=False)
 
