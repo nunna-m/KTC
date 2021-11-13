@@ -166,6 +166,13 @@ def copysubjects(subjects, path, modalities):
                         shutil.copytree(old_path,new_path)
 
 def remove_existing_folder(whichos, path):
+    '''
+    Removes existing target path folder after trainvaltest split
+    
+    Args:
+        whichos: linux,s windows or remote
+        path: absolute path to configfile that has information about datapath and targetpath. Currently only supports yaml extension
+    '''
     configs = return_configs_asdict(whichos, path)
     target_path = configs['os'][whichos]['after_split_path']
     if os.path.exists(target_path) and os.path.isdir(target_path):
