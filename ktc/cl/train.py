@@ -17,17 +17,22 @@ interface for training models
 import pdb
 import os
 import argparse
+from datetime import datetime
 
 # external
 import tensorflow as tf
 from tensorflow import keras
 import dsargparse
 import yaml
+import tensorboard as tb
 
 # customs
 from ktc.utils import get, store, load, dump
 from ktc import dataset, engine
 from ktc.models.tf_models import transfer_models, vanillacnn
+
+logsdir = "logs/fit/transfer_learning/" + datetime.now().strftime("%m%d-%H%M")
+tensorboard_callback = keras.callbacks.TensorBoard(log_dir=logsdir)
 
 def train(
     whichos,
@@ -126,6 +131,7 @@ def train(
         validation_data=val_ds,
         steps_per_epoch=1,
         epochs=max_steps,
+        callbacks = [tensorboard_callback]
         #callbacks=[LearningRateScheduler(lr_time_based_decay, verbose=1)],
 
     )
