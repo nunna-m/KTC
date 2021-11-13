@@ -1,5 +1,5 @@
 #!/bin/bash
-python -m ktc.pre split --whichos remote --path ktc/pre/paths.yaml
+python -m ktc.pre remove_existing_folder --whichos remote --path ktc/pre/paths.yaml
 python -m ktc.pre split --whichos remote --path ktc/pre/paths.yaml --modalities ['am']
 python3 -m ktc.pre split --whichos remote --path ktc/pre/paths.yaml --modalities ['tm']
 python3 -m ktc.pre split --whichos remote --path ktc/pre/paths.yaml --modalities ['dc']
