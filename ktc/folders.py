@@ -1,5 +1,5 @@
 import os
-aml = '/home/maanvi/LAB/Datasets/kt_new_trainvaltest/dc_ec/test/AML'
+aml = '/home/maanvi/LAB/Datasets/kt_new_trainvaltest/am_dc/train/AML'
 typ = aml.rsplit('/',2)[-2]
 gen_path = aml.rsplit('/',1)[0]
 cc = gen_path+'/CCRCC'
@@ -24,3 +24,30 @@ for base, dirs, files in os.walk(cc):
 print('type: {}'.format(typ))
 print("{}--AML files: {} ".format(' '.join(modals),nf_aml))
 print("{}--CCRCC files: {}".format(' '.join(modals),nf_cc))
+
+def count_samples(modalities, generalpath, split):
+    modalities = sorted(modalities, reverse=False)
+    ms = '_'.join(modalities)
+    aml = os.path.join(generalpath,ms,split,'AML')
+    nf_aml = 0
+    for base, dirs, files in os.walk(aml):
+        get_mode = base.rsplit('/',1)[1]
+        if get_mode in modals:
+            for file in os.walk(base):
+                nf_aml+=len(file[2])
+
+    nf_cc = 0
+    cc = os.path.join(generalpath,ms,split,'CCRCC')
+    for base, dirs, files in os.walk(cc):
+        get_mode = base.rsplit('/',1)[1]
+        if get_mode in modals:
+            for file in os.walk(base):
+                nf_cc+=len(file[2])
+
+    return {
+        'AML':nf_aml,
+        'CCRCC':nf_cc,
+        'total':nf_aml+nf_cc,
+    }
+
+print(count_samples(['dc','am'],'/home/maanvi/LAB/Datasets/kt_new_trainvaltest', 'train'))

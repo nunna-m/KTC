@@ -3,6 +3,8 @@ Transfer Learnt Models defined here
 '''
 
 # built-in
+import os
+import tempfile
 import pdb
 import numpy as np
 from numpy.lib.financial import rate
@@ -18,6 +20,32 @@ from tensorflow.python.keras.layers.advanced_activations import Softmax
 from tensorflow.keras import backend as K
 # customs
 from . import components
+
+def add_regularization(model, regularizer=tf.keras.regularizers.l1(0.001)):
+
+    if not isinstance(regularizer, tf.keras.regularizers.Regularizer):
+      print("Regularizer must be a subclass of tf.keras.regularizers.Regularizer")
+      return model
+
+    for layer in model.layers:
+        for attr in ['kernel_regularizer']:
+            if hasattr(layer, attr):
+              setattr(layer, attr, regularizer)
+
+    # When we change the layers attributes, the change only happens in the model config file
+    model_json = model.to_json()
+
+    # Save the weights before reloading the model.
+    tmp_weights_path = os.path.join(tempfile.gettempdir(), 'tmp_weights.h5')
+    model.save_weights(tmp_weights_path)
+
+    # load the model from the config
+    model = tf.keras.models.model_from_json(model_json)
+    
+    # Reload the model weights
+    model.load_weights(tmp_weights_path, by_name=True)
+    return model
+
 
 class mobile_net(Model):
     def __init__(
@@ -124,9 +152,15 @@ class vgg16_net(Model):
     ):
         super().__init__(**kargs)
         self.base_model = tf.keras.applications.VGG16(input_shape=(224, 224, 3), include_top=False, weights='imagenet')
+        #self.base_model = add_regularization(self.base_model)
         for self.layer in self.base_model.layers[:15]:
             self.layer.trainable = False
-        self.flatten = layers.Flatten()
+        for self.layer in self.base_model.layers[15:]:
+            self.layer.trainable = True
+        
+        self.last_layer = self.base_model.get_layer('block5_pool')
+        self.top_model = self.last_layer.output
+        self.gap = layers.GlobalAveragePooling2D()
         self.dense1 = layers.Dense(512, activation=activation)
         self.dropout = layers.Dropout(0.2)
         self.dense2 = layers.Dense(256, activation=activation)
@@ -136,9 +170,9 @@ class vgg16_net(Model):
     @tf.function
     def call(self, input_tensor, training=False):
         x = self.base_model(input_tensor)
-        x = self.flatten(x)
+        x = self.gap(x)
         x = self.dense1(x)
-        #x = self.dropout(x)
         x = self.dense2(x)
+        x = self.dropout(x)
         x = self.dense3(x)
         return x

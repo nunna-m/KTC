@@ -24,13 +24,14 @@ from datetime import datetime
 import tensorflow as tf
 from tensorflow import keras
 from matplotlib import pyplot as plt
+from sklearn.metrics import roc_curve, auc
 import dsargparse
 import yaml
 import tensorboard as tb
 
 # customs
 from ktc.utils import get, store, load, dump
-from ktc import dataset, engine
+from ktc import dataset, folders
 from ktc.models.tf_models import transfer_models, vanillacnn
 
 logsdir = "logs/fit/transfer_learning/" + datetime.now().strftime("%m%d-%H%M")
@@ -111,17 +112,15 @@ def train(
     # print(results)
     num_neurons = 1
     model = transfer_models.vgg16_net(classifier_neurons=num_neurons)
-    base_learning_rate = 0.001
-    epochs = 100
-    decay = base_learning_rate / epochs
+    base_learning_rate = 0.00001
+    decay = base_learning_rate / max_steps
     reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.2,
-                              patience=5, min_lr=0.001)
+                              patience=5, min_lr=base_learning_rate)
     early_stopping = tf.keras.callbacks.EarlyStopping(
-    monitor='val_prc', 
-    verbose=1,
-    patience=10,
-    mode='max',
-    restore_best_weights=True)
+                    monitor='val_loss',
+                    patience=20,
+                    mode='min',
+                    restore_best_weights=True)
     def lr_time_based_decay(epoch, lr):
         return lr * 1 / (1+decay*epoch)
     
@@ -140,12 +139,18 @@ def train(
     model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=base_learning_rate),
                 loss=tf.keras.losses.BinaryCrossentropy(),
                 metrics=METRICS)
+    batch_size = config['data_options']['train']['batch_size']
+    n_trainsteps = folders.count_samples(modalities,data_path,'train')['total']//batch_size
+    n_valsteps = folders.count_samples(modalities,data_path,'val')['total']//batch_size
     results = model.fit(
         ds,
+        batch_size = batch_size,
         validation_data=val_ds,
-        steps_per_epoch=1,
+        steps_per_epoch=n_trainsteps,
+        validation_steps=n_valsteps,
         epochs=max_steps,
-        callbacks = [reduce_lr, tensorboard_callback]
+        callbacks = [reduce_lr],
+        verbose=1
         #callbacks=[LearningRateScheduler(lr_time_based_decay, verbose=1)],
 
     )
@@ -162,11 +167,11 @@ def train(
     print("test loss, test acc: ",model.evaluate(test_ds))
     print("{} ***********************************RUN DONE ***********************************".format(modalities))
 
-    plot_metrics(results, save_path, modalities)
+    plot_metrics(results, save_path, modalities, metrics=METRICS)
     
     return results
 
-def plot_metrics(history, path, modals):
+def plot_metrics(history, path, modals, metrics):
     req = history.history
     if os.path.isdir(path) and os.path.exists(path):
         savepath = os.path.join(path, 'graphs','_'.join(modals))
@@ -184,13 +189,13 @@ def plot_metrics(history, path, modals):
     plt.close(fig)
 
     #plot training and val accuracy
-    # metric = 'categorical_accuracy'
-    # fig2 = plt.figure()
-    # plt.plot(req[metric])
-    # plt.plot(req['val_'+metric])
-    # plt.title('vgg16 fine tuning model '+metric[-8:])
-    # plt.xlabel('epoch')
-    # plt.legend(['train','val'], loc= 'upper left')
-    # plt.savefig(os.path.join(savepath,metric[-8:]+'.png'))
-    # plt.close(fig2)
+    metric = 'accuracy'
+    fig2 = plt.figure()
+    plt.plot(req[metric])
+    plt.plot(req['val_'+metric])
+    plt.title('vgg16 fine tuning model '+metric)
+    plt.xlabel('epoch')
+    plt.legend(['train','val'], loc= 'upper left')
+    plt.savefig(os.path.join(savepath,metric+'.png'))
+    plt.close(fig2)
 

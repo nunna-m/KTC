@@ -10,7 +10,7 @@ data_options:
         save_path:
             /home/maanvi/LAB/results/kidney_tumor
     train:
-        batch_size: 16
+        batch_size: 32
         buffer_size: 1024
         output_size: [224, 224]
         tumor_region_only: True
@@ -21,11 +21,11 @@ data_options:
             random_brightness:
                
     eval:
-        batch_size: 16
+        batch_size: 32
         output_size: [224, 224]
         tumor_region_only: True
 
     test:
-        batch_size: 16
+        batch_size: 32
         output_size: [224, 224]
         tumor_region_only: True
