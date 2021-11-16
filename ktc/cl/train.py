@@ -29,7 +29,7 @@ import dsargparse
 import yaml
 import tensorflow_datasets as tfds
 import tensorboard as tb
-
+import numpy as np
 # customs
 from ktc.utils import get, store, load, dump
 from ktc import dataset, folders
@@ -168,7 +168,11 @@ def train(
     print("test loss, test acc: ",model.evaluate(test_ds))
     print("{} ***********************************RUN DONE ***********************************".format(modalities))
 
-    print("TestDS:",test_ds)
+    test_ds_numpy = []
+    for iter in test_ds.as_numpy_iterator():
+        test_ds_numpy.append(iter)
+    test_ds_numpy = np.array(test_ds_numpy)
+    print("Test DS numpy: ", test_ds_numpy)
     print("Predicted:",model.predict(test_ds))
     plot_metrics(results, save_path, modalities, metrics=METRICS)
     
