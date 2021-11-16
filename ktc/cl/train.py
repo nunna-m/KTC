@@ -171,7 +171,7 @@ def train(
     for iter in test_ds.as_numpy_iterator():
         y_numpy.append(iter[1])
     y_numpy = np.array(y_numpy)
-    y_pred = model.predict(y_numpy)
+    y_pred = model.predict(test_ds)
     plot_loss_acc(results, save_path, modalities, metrics=METRICS)
 
     plot_roc(y_numpy, y_pred, modalities, save_path)
