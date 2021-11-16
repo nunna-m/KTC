@@ -1,2 +1,2 @@
-python3 -m ktc train --whichos remote --modalities am tm --config "configfiles/extra/data_options.yaml" --max_steps 100 --validate
-python3 -m ktc train --whichos remote --modalities dc --config "configfiles/extra/data_options.yaml" --max_steps 100 --validate
+python3 -m ktc train --whichos remote --modalities dc --config "configfiles/extra/data_options.yaml" --max_steps 50 --validate
+python3 -m ktc train --whichos remote --modalities am tm --config "configfiles/extra/data_options.yaml" --max_steps 50 --validate
