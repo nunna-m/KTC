@@ -174,7 +174,7 @@ def train(
     y_pred = model.predict(test_ds)
     plot_loss_acc(results, save_path, modalities, metrics=METRICS)
 
-    plot_roc(y_numpy, y_pred, modalities, save_path)
+    #plot_roc(y_numpy, y_pred, modalities, save_path)
     
     return results
 
@@ -182,15 +182,12 @@ def plot_roc(y_true, y_pred, modals, path):
     if os.path.isdir(path) and os.path.exists(path):
         savepath = os.path.join(path, 'graphs','_'.join(modals))
         os.makedirs(savepath, exist_ok=True)
-    fpr = dict()
-    tpr = dict()
-    roc_auc = dict()
-    for i in range(2):
-        fpr[i], tpr[i], _ = roc_curve(y_true, y_pred)
-        roc_auc[i] = auc(fpr[i], tpr[i])
+    
+    fpr, tpr, _ = roc_curve(y_true, y_pred)
+    roc_auc = auc(fpr, tpr)
     
     fig = plt.figure()
-    plt.plot(fpr[1], tpr[1])
+    plt.plot(fpr, tpr)
     plt.xlim([0.0, 1.0])
     plt.ylim([0.0, 1.05])
     plt.xlabel('False Positive Rate')
