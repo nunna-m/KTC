@@ -27,6 +27,7 @@ from matplotlib import pyplot as plt
 from sklearn.metrics import roc_curve, auc
 import dsargparse
 import yaml
+import tensorflow_datasets as tfds
 import tensorboard as tb
 
 # customs
@@ -167,6 +168,8 @@ def train(
     print("test loss, test acc: ",model.evaluate(test_ds))
     print("{} ***********************************RUN DONE ***********************************".format(modalities))
 
+    print("TestDS:",tfds.as_numpy(test_ds))
+    print("Predicted:",tfds.as_numpy(model.predict(test_ds)))
     plot_metrics(results, save_path, modalities, metrics=METRICS)
     
     return results
