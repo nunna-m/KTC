@@ -168,11 +168,11 @@ def train(
     print("test loss, test acc: ",model.evaluate(test_ds))
     print("{} ***********************************RUN DONE ***********************************".format(modalities))
 
-    test_ds_numpy = []
+    y_numpy = []
     for iter in test_ds.as_numpy_iterator():
-        test_ds_numpy.append(iter)
-    test_ds_numpy = np.array(test_ds_numpy)
-    print("Test DS numpy: ", test_ds_numpy)
+        y_numpy.append(iter[1])
+    y_numpy = np.array(y_numpy)
+    print("Test DS numpy: ", y_numpy)
     print("Predicted:",model.predict(test_ds))
     plot_metrics(results, save_path, modalities, metrics=METRICS)
     
