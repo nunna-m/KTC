@@ -170,11 +170,12 @@ def train(
     y_numpy = []
     for iter in test_ds.as_numpy_iterator():
         y_numpy.append(iter[1])
-    y_numpy = np.array(y_numpy)
+    y_numpy = y_numpy[0]
     y_pred = model.predict(test_ds)
+    y_pred = np.squeeze(y_pred)
     plot_loss_acc(results, save_path, modalities, metrics=METRICS)
 
-    #plot_roc(y_numpy, y_pred, modalities, save_path)
+    plot_roc(y_numpy, y_pred, modalities, save_path)
     
     return results
 
@@ -185,7 +186,7 @@ def plot_roc(y_true, y_pred, modals, path):
     
     fpr, tpr, _ = roc_curve(y_true, y_pred)
     roc_auc = auc(fpr, tpr)
-    
+    print("AUC: ",roc_auc)
     fig = plt.figure()
     plt.plot(fpr, tpr)
     plt.xlim([0.0, 1.0])

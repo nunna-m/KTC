@@ -21,11 +21,11 @@ data_options:
             random_brightness:
                
     eval:
-        batch_size: 32
+        batch_size: 16
         output_size: [224, 224]
         tumor_region_only: True
 
     test:
-        batch_size: 32
+        batch_size: 16
         output_size: [224, 224]
         tumor_region_only: True
