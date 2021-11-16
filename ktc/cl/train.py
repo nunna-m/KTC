@@ -110,6 +110,7 @@ def train(
 
     # )
     # print(results)
+    tf.keras.backend.clear_session()
     num_neurons = 1
     model = transfer_models.vgg16_net(classifier_neurons=num_neurons)
     base_learning_rate = 0.00001
@@ -142,12 +143,14 @@ def train(
     batch_size = config['data_options']['train']['batch_size']
     n_trainsteps = folders.count_samples(modalities,data_path,'train')['total']//batch_size
     n_valsteps = folders.count_samples(modalities,data_path,'val')['total']//batch_size
+
+    print("batchsize, trainsteps, valsteps")
+    print(batch_size, n_trainsteps, n_valsteps)
     results = model.fit(
         ds,
         batch_size = batch_size,
         validation_data=val_ds,
         steps_per_epoch=n_trainsteps,
-        validation_steps=n_valsteps,
         epochs=max_steps,
         callbacks = [reduce_lr],
         verbose=1

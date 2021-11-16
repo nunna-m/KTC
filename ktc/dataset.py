@@ -547,6 +547,7 @@ def random_shear_x_y(image, label, x_axis, y_axis):
 def configure_dataset(dataset, batch_size, buffer_size, repeat=False):
     dataset = dataset.shuffle(buffer_size)
     if repeat:
+        print("entering repeat")
         dataset = dataset.repeat(None)
     dataset = dataset.batch(batch_size)
     dataset = dataset.prefetch(tf.data.experimental.AUTOTUNE)

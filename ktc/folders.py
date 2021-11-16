@@ -1,5 +1,5 @@
 import os
-aml = '/home/maanvi/LAB/Datasets/kt_new_trainvaltest/am_dc/train/AML'
+aml = '/home/maanvi/LAB/Datasets/kt_new_trainvaltest/am_dc/val/AML'
 typ = aml.rsplit('/',2)[-2]
 gen_path = aml.rsplit('/',1)[0]
 cc = gen_path+'/CCRCC'
@@ -50,4 +50,4 @@ def count_samples(modalities, generalpath, split):
         'total':nf_aml+nf_cc,
     }
 
-print(count_samples(['dc','am'],'/home/maanvi/LAB/Datasets/kt_new_trainvaltest', 'train'))
+print(count_samples(['dc'],'/home/maanvi/LAB/Datasets/kt_new_trainvaltest', 'val'))
