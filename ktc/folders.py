@@ -54,7 +54,6 @@ def count_samples(modalities, generalpath, split):
             if mode in modalities:
                 mode_path = os.path.join(cc, subject, mode)
                 listout = os.listdir(mode_path)
-                print(listout)
                 if len(listout) < count:
                     count = len(listout)
         nf_cc += count
