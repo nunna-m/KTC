@@ -21,7 +21,7 @@ from tensorflow.keras import backend as K
 # customs
 from . import components
 
-def add_regularization(model, regularizer=tf.keras.regularizers.l1(0.001)):
+def add_regularization(model, regularizer=tf.keras.regularizers.l2(0.0001)):
 
     if not isinstance(regularizer, tf.keras.regularizers.Regularizer):
       print("Regularizer must be a subclass of tf.keras.regularizers.Regularizer")

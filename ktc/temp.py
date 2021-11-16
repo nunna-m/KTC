@@ -1,6 +1,4 @@
 import os
-
-from tensorflow.python.ops.gen_array_ops import one_hot
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
 
 import tensorflow as tf
@@ -84,7 +82,7 @@ def load_raw(traindir, modalities=['am','tm','dc','ec','pc'], output_size=(224,2
             #cycle_length=1,
             num_parallel_calls=tf.data.experimental.AUTOTUNE,
         )
-    print("LABEL ds: ",label_ds)
+    #print("LABEL ds: ",label_ds)
     feature_ds = ds.interleave(
             partial(
                 tf_combine_modalities,
@@ -108,11 +106,11 @@ def load_raw(traindir, modalities=['am','tm','dc','ec','pc'], output_size=(224,2
         )
 
     ds = tf.data.Dataset.zip((feature_ds, label_ds))
-    i = 0
-    for ele in ds.as_numpy_iterator():
-        if i<100:
-            print(i, ele[0].shape, ele[1])
-            i+=1
+    # i = 0
+    # for ele in ds.as_numpy_iterator():
+    #     if i<100:
+    #         print(i, ele[0].shape, ele[1])
+    #         i+=1
     norm = 3
     ds = ds.map(lambda image, label: tf_reshape_cast_normalize(image, label, num_mod=norm, dtype=dtype), tf.data.experimental.AUTOTUNE)
     
@@ -206,7 +204,6 @@ def combine_modalities(subject, output_size, modalities, tumor_region_only):
                 modals = tf.repeat(modals, repeats=[diff],axis=-1)
         slices.append(modals)
     slices = tf.stack(slices, axis=0)
-    print(subject_data['subject_path'])
     #print("Slices in combine mods: ",slices.shape)
     #return slices, labels
     return dict(
@@ -232,6 +229,17 @@ def parse_subject(subject_path, output_size, modalities,tumor_region_only, decod
     
     assert same_named_slices, f'Not enough slices with same name in {subject_path}'
 
+    print(subject_data['subject_path'])
+    print("same named slices:  ",same_named_slices)
+
+    old_gathered_modalities = dict()
+    for temp in modalities:
+        old_gathered_modalities[temp] = gathered_modalities_paths[temp]
+    print(old_gathered_modalities)
+    for temp in modalities:
+        print("gathered modalities slice names of: {}".format(temp))
+        gathered_modalities_paths[temp] = {k+'.png' for k in same_named_slices}
+        print(gathered_modalities_paths[temp])
     for modality in modalities:
         gathered_modalities_paths[modality] = list(
             filter(lambda x: os.path.splitext(x)[0],
@@ -543,18 +551,16 @@ def configure_dataset(dataset, batch_size, buffer_size, repeat=False):
     dataset = dataset.prefetch(tf.data.experimental.AUTOTUNE)
     return dataset
 
-final_dataset = train_dataset(data_root='/home/maanvi/LAB/Datasets/sample_kt',batch_size=4,buffer_size=10,repeat=True,modalities=['dc'],output_size=(224,224),aug_configs=None,tumor_region_only=True)
+# final_dataset = train_dataset(data_root='/home/maanvi/LAB/Datasets/sample_kt',batch_size=4,buffer_size=10,repeat=True,modalities=['ec','tm'],output_size=(224,224),aug_configs=None,tumor_region_only=True)
 
 # final_dataset = train_dataset(data_root='D:/01_Maanvi/LABB/datasets/sample_kt',batch_size=4,buffer_size=10,repeat=True,modalities=('am','tm'),output_size=(224,224),aug_configs=None,tumor_region_only=False)
 
-# parse_subject(
-#     subject_path='/home/maanvi/LAB/Datasets/sample_kt/am_tm/train/CCRCC/18626417',
-#     output_size=(224,224),
-#     modalities=('am','tm'),
-#     tumor_region_only=False,
-# )
-
-
+parse_subject(
+    subject_path='/home/maanvi/LAB/Datasets/kt_new_trainvaltest/ec_tm/train/AML/16639185',
+    output_size=(224,224),
+    modalities=('ec','tm'),
+    tumor_region_only=False,
+)
 print("done generating dataset")
 
 

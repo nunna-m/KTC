@@ -40,7 +40,6 @@ def train_ds(
         random_rotation_img: {},
         random_shear_img: {},
     }
-    #print("Data_root---------:",data_root)
     traindir = os.path.join(data_root,'_'.join(modalities),'train')
     dataset = load_raw(
         traindir,
@@ -261,7 +260,8 @@ def parse_subject(subject_path, output_size, modalities,tumor_region_only, decod
         ))
     
     assert same_named_slices, f'Not enough slices with same name in {subject_path}'
-
+    for temp in modalities:
+        gathered_modalities_paths[temp] = {k+'.png' for k in same_named_slices}
     for modality in modalities:
         gathered_modalities_paths[modality] = list(
             filter(lambda x: os.path.splitext(x)[0],

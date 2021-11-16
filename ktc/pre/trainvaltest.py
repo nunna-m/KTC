@@ -81,6 +81,7 @@ def get_slicetypecount_subjects(dataset_path,modalities, counts, clas, folders):
     for folder in folders:
         folder_path = os.path.join(dataset_path,clas,folder)
         modes = os.listdir(folder_path)
+        print(modes)
         count=0
         for m in modes:
             if m in modalities:

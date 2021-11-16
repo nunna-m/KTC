@@ -3,9 +3,7 @@ CLI for train command
 '''
 
 import os
-from tensorflow.keras import metrics
-from tensorflow.python.keras.callbacks import LearningRateScheduler
-import yaml
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 from ktc.utils import get, store, load, dump
 from ktc import dataset
@@ -15,16 +13,15 @@ interface for training models
 '''
 
 # built-in
-import pdb
-import os
-import argparse
 from datetime import datetime
 
 # external
 import tensorflow as tf
 from tensorflow import keras
 from matplotlib import pyplot as plt
-from sklearn.metrics import roc_curve, auc
+from sklearn.metrics import roc_curve, auc, confusion_matrix, fbeta_score, precision_score, recall_score, accuracy_score
+import pandas as pd
+import csv
 import dsargparse
 import yaml
 import tensorboard as tb
@@ -73,6 +70,7 @@ def train(
     '''
     config = load.load_config(config)
     print("modalities and os: ",modalities, whichos)
+    modalities = sorted(modalities, reverse=False)
     save_path = config['data_options'][whichos]['save_path']
     data_path = config['data_options'][whichos]['data_path']
     dump.dump_options(
@@ -82,6 +80,7 @@ def train(
         save_path=save_path,
         data_path=data_path,
     )
+    print(save_path,data_path)
     ds = dataset.train_ds(data_path, modalities, **config['data_options']['train'])
     if validate:
         #assert val_data_path is not None
@@ -144,6 +143,7 @@ def train(
     n_trainsteps = folders.count_samples(modalities,data_path,'train')['total']//batch_size
     n_valsteps = folders.count_samples(modalities,data_path,'val')['total']//batch_size
 
+    #n_trainsteps = 1
     print("batchsize, trainsteps, valsteps")
     print(batch_size, n_trainsteps, n_valsteps)
     results = model.fit(
@@ -170,25 +170,52 @@ def train(
     print("test loss, test acc: ",model.evaluate(test_ds))
     print("{} ***********************************RUN DONE ***********************************".format(modalities))
 
+    nf_aml = folders.count_samples(modalities,data_path,'test')['AML']
+    nf_cc = folders.count_samples(modalities,data_path,'test')['CCRCC']
+    if os.path.isdir(save_path) and os.path.exists(save_path):
+        sendpath = os.path.join(save_path, 'graphs','_'.join(modalities))
+        os.makedirs(sendpath, exist_ok=True)
+    colnames = ['Modalities','#AML(no)','#CCRCC(yes)','AUC','TP','FP','TN','FN','recall','specificity','f2','accuracy']
     y_numpy = []
     for iter in test_ds.as_numpy_iterator():
         y_numpy.append(iter[1])
     y_numpy = y_numpy[0]
     y_pred = model.predict(test_ds)
+    y_pred_classes = y_pred.argmax(axis=-1)
     y_pred = np.squeeze(y_pred)
-    plot_loss_acc(results, save_path, modalities, metrics=METRICS)
+    print(y_numpy.shape, y_pred.shape)
+    
+    eval_metrics = {k:0 for k in colnames}
+    roundoff = 3
+    eval_metrics['Modalities'] = ' '.join(modalities)
+    eval_metrics['#AML(no)'] = nf_aml
+    eval_metrics['#CCRCC(yes)'] = nf_cc
+    eval_metrics['accuracy'] = np.round_(accuracy_score(y_numpy, y_pred_classes),roundoff)
+    plot_loss_acc(results, sendpath, metrics=METRICS)
 
-    plot_roc(y_numpy, y_pred, modalities, save_path)
+    eval_metrics = plot_roc(eval_metrics, y_numpy, y_pred, sendpath, roundoff)
+    eval_metrics = plot_confmat(eval_metrics, y_numpy, y_pred_classes, sendpath, roundoff)
+
+    eval_metrics['recall'] = np.round_((eval_metrics['TP'])/(eval_metrics['TP']+eval_metrics['FN']),roundoff)
+    eval_metrics['specificity'] = np.round_((eval_metrics['TN'])/(eval_metrics['TN']+eval_metrics['FP']),roundoff)
+
+    print(eval_metrics)
+
+    metrics_path = os.path.join(save_path,'graphs','metrics.csv')
+    if not os.path.exists(metrics_path):
+        df = pd.DataFrame(columns=colnames)
+        df = df.append(eval_metrics,ignore_index=True)
+        df.to_csv(os.path.join(save_path,'graphs','metrics.csv'))
+    else:
+        extra = pd.DataFrame([eval_metrics])
+        extra.to_csv(os.path.join(save_path,'graphs','metrics.csv'), mode='a', header=False)
     
     return results
 
-def plot_roc(y_true, y_pred, modals, path):
-    if os.path.isdir(path) and os.path.exists(path):
-        savepath = os.path.join(path, 'graphs','_'.join(modals))
-        os.makedirs(savepath, exist_ok=True)
-    
+def plot_roc(eval_metrics, y_true, y_pred, path, roundoff):
     fpr, tpr, _ = roc_curve(y_true, y_pred)
     roc_auc = auc(fpr, tpr)
+    eval_metrics['AUC'] = np.round_(roc_auc,roundoff)
     print("AUC: ",roc_auc)
     fig = plt.figure()
     plt.plot(fpr, tpr)
@@ -197,14 +224,43 @@ def plot_roc(y_true, y_pred, modals, path):
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
     plt.title('Receiver operating characteristic')
-    plt.savefig(os.path.join(savepath,'roc.png'))
+    plt.savefig(os.path.join(path,'roc.png'))
     plt.close(fig)
 
-def plot_loss_acc(history, path, modals, metrics):
+    return eval_metrics
+    
+
+def plot_confmat(eval_metrics, y_true, y_pred, path, roundoff):
+    f2 = fbeta_score(y_true, y_pred, beta=2.0)
+    print('f-beta: ',f2)
+    eval_metrics['f2'] = np.round_(f2,roundoff)
+    cf = confusion_matrix(y_true, y_pred)
+    print(cf)
+    tn, fp, fn, tp = cf.ravel()
+    eval_metrics['TP'] = tp
+    eval_metrics['FP'] = fp
+    eval_metrics['FN'] = fn
+    eval_metrics['TN'] = tn
+
+    classes = ['AML', 'CCRCC']
+    title = "Confusion Matrix"
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    cax = ax.matshow(cf)
+    plt.title('Confusion matrix of the classifier')
+    fig.colorbar(cax)
+    ax.set_xticklabels([''] + classes)
+    ax.set_yticklabels([''] + classes)
+    plt.xlabel('Predicted')
+    plt.ylabel('True')
+    plt.title(title)
+    plt.savefig(os.path.join(path,'cf.png'))
+    plt.close(fig)
+
+    return eval_metrics
+
+def plot_loss_acc(history, path, metrics):
     req = history.history
-    if os.path.isdir(path) and os.path.exists(path):
-        savepath = os.path.join(path, 'graphs','_'.join(modals))
-        os.makedirs(savepath, exist_ok=True)
     
     #plot training and val loss
     metric = 'loss'
@@ -214,7 +270,7 @@ def plot_loss_acc(history, path, modals, metrics):
     plt.title('vgg16 fine tuning model '+metric)
     plt.xlabel('epoch')
     plt.legend(['train','val'], loc= 'upper left')
-    plt.savefig(os.path.join(savepath,metric+'.png'))
+    plt.savefig(os.path.join(path,metric+'.png'))
     plt.close(fig)
 
     #plot training and val accuracy
@@ -225,6 +281,6 @@ def plot_loss_acc(history, path, modals, metrics):
     plt.title('vgg16 fine tuning model '+metric)
     plt.xlabel('epoch')
     plt.legend(['train','val'], loc= 'upper left')
-    plt.savefig(os.path.join(savepath,metric+'.png'))
+    plt.savefig(os.path.join(path,metric+'.png'))
     plt.close(fig2)
 
