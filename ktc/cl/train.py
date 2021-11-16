@@ -27,7 +27,6 @@ from matplotlib import pyplot as plt
 from sklearn.metrics import roc_curve, auc
 import dsargparse
 import yaml
-import tensorflow_datasets as tfds
 import tensorboard as tb
 import numpy as np
 # customs
@@ -172,13 +171,35 @@ def train(
     for iter in test_ds.as_numpy_iterator():
         y_numpy.append(iter[1])
     y_numpy = np.array(y_numpy)
-    print("Test DS numpy: ", y_numpy)
-    print("Predicted:",model.predict(test_ds))
-    plot_metrics(results, save_path, modalities, metrics=METRICS)
+    y_pred = model.predict(y_numpy)
+    plot_loss_acc(results, save_path, modalities, metrics=METRICS)
+
+    plot_roc(y_numpy, y_pred, modalities, save_path)
     
     return results
 
-def plot_metrics(history, path, modals, metrics):
+def plot_roc(y_true, y_pred, modals, path):
+    if os.path.isdir(path) and os.path.exists(path):
+        savepath = os.path.join(path, 'graphs','_'.join(modals))
+        os.makedirs(savepath, exist_ok=True)
+    fpr = dict()
+    tpr = dict()
+    roc_auc = dict()
+    for i in range(2):
+        fpr[i], tpr[i], _ = roc_curve(y_true, y_pred)
+        roc_auc[i] = auc(fpr[i], tpr[i])
+    
+    fig = plt.figure()
+    plt.plot(fpr[1], tpr[1])
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('Receiver operating characteristic')
+    plt.savefig(os.path.join(savepath,'roc.png'))
+    plt.close(fig)
+
+def plot_loss_acc(history, path, modals, metrics):
     req = history.history
     if os.path.isdir(path) and os.path.exists(path):
         savepath = os.path.join(path, 'graphs','_'.join(modals))
