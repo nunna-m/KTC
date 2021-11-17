@@ -3,10 +3,8 @@ CLI for train command
 '''
 
 import os
-
-from tensorflow.python.training.tracking.tracking import Asset
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-
+import sys
 from ktc.utils import get, store, load, dump
 from ktc import dataset
 from ktc.cl import train as trainfile
@@ -20,17 +18,20 @@ from datetime import datetime
 
 # external
 import tensorflow as tf
+import tensorflow_decision_forests as tfdf
 from tensorflow import keras
 from matplotlib import pyplot as plt
 from sklearn.metrics import roc_curve, auc, confusion_matrix, fbeta_score, precision_score, recall_score, accuracy_score
 import pandas as pd
 from tqdm import tqdm
-import tensorboard as tb
+import xgboost as xgb
 import numpy as np
 # customs
 from ktc.utils import get, store, load, dump
 from ktc import dataset, folders
 from ktc.models.tf_models import transfer_models, vanillacnn
+
+from tensorflow.python.keras.applications.vgg16 import VGG16
 
 logsdir = "logs/fit/transfer_learning/" + datetime.now().strftime("%m%d-%H%M")
 tensorboard_callback = keras.callbacks.TensorBoard(log_dir=logsdir)
@@ -82,22 +83,26 @@ def train_stacked(
         data_path=data_path,
     )
     print(save_path,data_path)
-    ct_modalities = [i for i in modalities if "c" in i]
-    mri_modalities = [i for i in modalities if "m" in i]
-    assert ct_modalities, mri_modalities
-    ds_ct = dataset.train_ds(data_path, modalities=ct_modalities, **config['data_options']['train'])
-    ds_mri = dataset.train_ds(data_path, modalities=mri_modalities, **config['data_options']['train'])
+    # ct_modalities = [i for i in modalities if "c" in i]
+    # mri_modalities = [i for i in modalities if "m" in i]
+    # assert ct_modalities, mri_modalities
+    ds = dataset.train_ds(data_path, modalities, **config['data_options']['train'])
+    # ds_ct = dataset.train_ds(data_path, modalities=ct_modalities, **config['data_options']['train'])
+    # ds_mri = dataset.train_ds(data_path, modalities=mri_modalities, **config['data_options']['train'])
     if validate:
         #assert val_data_path is not None
-        val_ds_ct = dataset.eval_ds(data_path, modalities=ct_modalities, **config['data_options']['eval'])
-        val_ds_mri = dataset.eval_ds(data_path, modalities=mri_modalities, **config['data_options']['eval'])
-    else: 
+        val_ds = dataset.eval_ds(data_path, modalities, **config['data_options']['eval'])
+        # val_ds_ct = dataset.eval_ds(data_path, modalities=ct_modalities, **config['data_options']['eval'])
+        # val_ds_mri = dataset.eval_ds(data_path, modalities=mri_modalities, **config['data_options']['eval'])
+    else:
+        val_ds = None
         val_ds_ct = None
         val_ds_mri = None
 
     #loading testing dataset
-    test_ds_ct = dataset.predict_ds(data_path, modalities=ct_modalities, **config['data_options']['test'])
-    test_ds_mri = dataset.predict_ds(data_path, modalities=mri_modalities, **config['data_options']['test'])
+    test_ds = dataset.predict_ds(data_path, modalities, **config['data_options']['test'])
+    # test_ds_ct = dataset.predict_ds(data_path, modalities=ct_modalities, **config['data_options']['test'])
+    # test_ds_mri = dataset.predict_ds(data_path, modalities=mri_modalities, **config['data_options']['test'])
 
 
     tf.keras.backend.clear_session()
@@ -123,90 +128,51 @@ def train_stacked(
     reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.2,
                               patience=5, min_lr=base_learning_rate)
     
-    #ct network
-    ct_model = transfer_models.stackedGB_net(classifier_neurons=num_neurons)
-    ct_model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=base_learning_rate),
-                loss=tf.keras.losses.BinaryCrossentropy(),
-                metrics=METRICS)
-    results = ct_model.fit(
-        ds_ct,
-        batch_size = batch_size,
-        validation_data=val_ds_ct,
-        steps_per_epoch=n_trainsteps,
-        epochs=max_steps,
-        callbacks = [reduce_lr],
-        verbose=1
-    )
-    ct_features = ct_model.predict(test_ds_ct)
-
-
-    #mri network
-    mri_model = transfer_models.stackedGB_net(classifier_neurons=num_neurons)
-    mri_model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=base_learning_rate),
-                loss=tf.keras.losses.BinaryCrossentropy(),
-                metrics=METRICS)
-    results = mri_model.fit(
-        ds_mri,
-        batch_size = batch_size,
-        validation_data=val_ds_mri,
-        steps_per_epoch=n_trainsteps,
-        epochs=max_steps,
-        callbacks = [reduce_lr],
-        verbose=1
-    )
     
+    vgg_model = tf.keras.applications.VGG16(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
+    for layer in vgg_model.layers:
+	    layer.trainable = False
+    vgg_model.summary()  #Trainable parameters will be 0
+
+    # vgg_model.fit(
+    #     ds,
+    #     epochs=1,
+    # )
+    feature_extractor = vgg_model.predict(ds)
+    print(feature_extractor)
+    # model = tfdf.keras.RandomForestModel()
+    # model.compile(metrics=['accuracy'])
+    # with sys.pipes():
+    #     model.fit(x=ds)
+
+    #Now, let us use features from convolutional network for RF
+    # X_train, y_train = list(ds.as_numpy_iterator())
+    # X_test, y_test = list(test_ds.as_numpy_iterator())
+    # feature_extractor=vgg_model.predict(X_train)
+    # print(feature_X_train.shape, y_train.shape)
+    # print(X_test.shape, y_train.shape)
+    # print("done extracting features from vgg model")
     
+    # features = feature_X_train.reshape(feature_extractor.shape[0], -1)
 
-    loss, tp, fp, tn, fn, acc, precision, recall, AUC, prc = model.evaluate(test_ds)
-    tp = int(tp)
-    fp = int(fp)
-    tn = int(tn)
-    fn = int(fn)
-    print("test loss, test acc: ",model.evaluate(test_ds))
-    print("{} ***********************************RUN DONE ***********************************".format(modalities))
-
-    nf_aml = folders.count_samples(modalities,data_path,'test')['AML']
-    nf_cc = folders.count_samples(modalities,data_path,'test')['CCRCC']
-    if os.path.isdir(save_path) and os.path.exists(save_path):
-        sendpath = os.path.join(save_path, 'graphs','_'.join(modalities))
-        os.makedirs(sendpath, exist_ok=True)
-    colnames = ['Modalities','#AML(no)','#CCRCC(yes)','AUC','TP','FP','TN','FN','recall','specificity','f2','accuracy']
-    y_numpy = []
-    for iter in test_ds.as_numpy_iterator():
-        y_numpy.append(iter[1])
-    y_numpy = y_numpy[0]
-    y_pred = model.predict(test_ds)
-    y_pred_classes = y_pred.argmax(axis=-1)
-    y_pred = np.squeeze(y_pred)
-    print(y_pred_classes)
+    # X_for_training = features #This is our X input to RF
     
-    eval_metrics = {k:0 for k in colnames}
-    roundoff = 3
-    eval_metrics['Modalities'] = ' '.join(modalities)
-    eval_metrics['#AML(no)'] = nf_aml
-    eval_metrics['#CCRCC(yes)'] = nf_cc
-    eval_metrics['TP'] = tp
-    eval_metrics['FP'] = fp
-    eval_metrics['TN'] = tn
-    eval_metrics['FN'] = fn
-    eval_metrics['accuracy'] = np.round_(acc,roundoff)
-    eval_metrics['AUC'] = AUC
-    trainfile.plot_loss_acc(results, sendpath, metrics=METRICS)
-    trainfile.plot_roc(y_numpy, y_pred, sendpath)
-    f2 = trainfile.plot_confmat(tp, fp, tn, fn, sendpath, roundoff)
-    eval_metrics['f2'] = np.round_(f2,roundoff)
-    eval_metrics['recall'] = np.round_((tp/(tp+fn)),roundoff)
-    eval_metrics['specificity'] = np.round_((tn/(tn+fp)),roundoff)
+    # model = xgb.XGBClassifier()
+    # model.fit(X_for_training, y_train, verbose=1)
+    # print("done fitting on xgboost")
 
-    print(eval_metrics)
+    # X_test_feature = vgg_model.predict(X_test)
+    # X_test_features = X_test_feature.reshape(X_test_feature.shape[0], -1)
 
-    metrics_path = os.path.join(save_path,'graphs','metrics.csv')
-    if not os.path.exists(metrics_path):
-        df = pd.DataFrame(columns=colnames)
-        df = df.append(eval_metrics,ignore_index=True)
-        df.to_csv(os.path.join(save_path,'graphs','metrics.csv'))
-    else:
-        extra = pd.DataFrame([eval_metrics])
-        extra.to_csv(os.path.join(save_path,'graphs','metrics.csv'), mode='a', header=False)
+    # prediction = model.predict(X_test_features)
+    # #Print overall accuracy
+    # from sklearn import metrics
+    # print ("Accuracy = ", metrics.accuracy_score(y_test, prediction))
+
+    # #Confusion Matrix - verify accuracy of each class
+    # from sklearn.metrics import confusion_matrix
+
+    # cm = confusion_matrix(y_test, prediction)
+    # print(cm)
     
-    return results
+    return 0

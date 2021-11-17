@@ -203,9 +203,9 @@ class stackedGB_net(Model):
     @tf.function
     def call(self, input_tensor, training=False):
         x = self.base_model(input_tensor)
-        x = self.gap(x)
-        x = self.dense1(x)
-        x = self.dense2(x)
-        x = self.dropout(x)
-        x = self.dense3(x)
+        # x = self.gap(x)
+        # x = self.dense1(x)
+        # x = self.dense2(x)
+        # x = self.dropout(x)
+        # x = self.dense3(x)
         return x

@@ -19,7 +19,8 @@ from datetime import datetime
 import tensorflow as tf
 from tensorflow import keras
 from matplotlib import pyplot as plt
-from sklearn.metrics import roc_curve, auc, confusion_matrix, fbeta_score, precision_score, recall_score, accuracy_score
+from sklearn.metrics import roc_curve
+from tqdm.keras import TqdmCallback
 import pandas as pd
 import csv
 import dsargparse
@@ -152,10 +153,8 @@ def train(
         validation_data=val_ds,
         steps_per_epoch=n_trainsteps,
         epochs=max_steps,
-        callbacks = [reduce_lr],
-        verbose=1
-        #callbacks=[LearningRateScheduler(lr_time_based_decay, verbose=1)],
-
+        callbacks = [reduce_lr, TqdmCallback(verbose=2)],
+        verbose=0,
     )
     
     # dump.dump_train_results(
@@ -166,6 +165,8 @@ def train(
 
     #predict
     test_ds = dataset.predict_ds(data_path, modalities, **config['data_options']['test'])
+
+    #print(list(test_ds.as_numpy_iterator()))
 
     loss, tp, fp, tn, fn, acc, precision, recall, AUC, prc = model.evaluate(test_ds)
     tp = int(tp)
