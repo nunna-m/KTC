@@ -15,4 +15,4 @@ tensorboard_plugin_profile
 ruamel.yaml
 scipy
 scikit-learn
-seaborn
+xgboost

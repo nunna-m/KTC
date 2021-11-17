@@ -7,7 +7,7 @@ import os
 import tempfile
 import pdb
 import numpy as np
-from numpy.lib.financial import rate
+import xgboost as xgb
 
 # external
 import tensorflow as tf
@@ -178,3 +178,39 @@ class vgg16_net(Model):
         return x
 
 
+class stacked_model(Model):
+    def __init__(
+        self,
+        activation='relu',
+        padding='same',
+        pool_size=(2,2),
+        strides=(2,2),
+        kernel_size=(3,3),
+        output_size=(224,224,3),
+        **kargs,
+    ):
+        super().__init__(**kargs)
+        
+        self.imageInput = layers.Input(shape=output_size,
+                                    name='input_1')
+        self.conv1 = layers.Conv2D(64, kernel_size=kernel_size, activation=activation, padding=padding, name='block1_conv1')
+        self.conv2 = layers.Conv2D(64, kernel_size=kernel_size, activation=activation, padding=padding, name='block1_conv2')
+        self.maxpool1 = layers.MaxPool2D(pool_size=pool_size, strides=strides, name='block1_pool')
+
+        self.conv3 = layers.Conv2D(128, kernel_size=kernel_size, activation=activation, padding=padding, name='block2_conv1')
+        self.conv4 = layers.Conv2D(128, kernel_size=kernel_size, activation=activation, padding=padding, name='block2_conv2')
+        self.maxpool2 = layers.MaxPool2D(pool_size=pool_size, strides=strides, name='block2_pool')
+        
+    
+    @tf.function
+    def call(self, input_tensor, training=False):
+        x = input_tensor
+        #x = self.imageInput(input_tensor)
+        x = self.conv1(x)
+        x = self.conv2(x)
+        x = self.maxpool1(x)
+
+        x = self.conv3(x)
+        x = self.conv4(x)
+        x = self.maxpool2(x)
+        return x
