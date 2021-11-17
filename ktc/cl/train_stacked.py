@@ -176,3 +176,36 @@ def train_stacked(
     # print(cm)
     
     return 0
+
+
+#ct network
+    ct_model = transfer_models.stackedGB_net(classifier_neurons=num_neurons)
+    ct_model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=base_learning_rate),
+                loss=tf.keras.losses.BinaryCrossentropy(),
+                metrics=METRICS)
+    results = ct_model.fit(
+        ds_ct,
+        batch_size = batch_size,
+        validation_data=val_ds_ct,
+        steps_per_epoch=n_trainsteps,
+        epochs=max_steps,
+        callbacks = [reduce_lr],
+        verbose=1
+    )
+    ct_features = ct_model.predict(test_ds_ct)
+
+
+    #mri network
+    mri_model = transfer_models.stackedGB_net(classifier_neurons=num_neurons)
+    mri_model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=base_learning_rate),
+                loss=tf.keras.losses.BinaryCrossentropy(),
+                metrics=METRICS)
+    results = mri_model.fit(
+        ds_mri,
+        batch_size = batch_size,
+        validation_data=val_ds_mri,
+        steps_per_epoch=n_trainsteps,
+        epochs=max_steps,
+        callbacks = [reduce_lr],
+        verbose=1
+    )
