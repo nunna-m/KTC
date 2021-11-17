@@ -3,6 +3,8 @@ CLI for train command
 '''
 
 import os
+
+from tensorflow.python.training.tracking.tracking import Asset
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 from ktc.utils import get, store, load, dump
@@ -80,11 +82,23 @@ def train_stacked(
         data_path=data_path,
     )
     print(save_path,data_path)
-    ds = dataset.train_ds(data_path, modalities, **config['data_options']['train'])
+    ct_modalities = [i for i in modalities if "c" in i]
+    mri_modalities = [i for i in modalities if "m" in i]
+    assert ct_modalities, mri_modalities
+    ds_ct = dataset.train_ds(data_path, modalities=ct_modalities, **config['data_options']['train'])
+    ds_mri = dataset.train_ds(data_path, modalities=mri_modalities, **config['data_options']['train'])
     if validate:
         #assert val_data_path is not None
-        val_ds = dataset.eval_ds(data_path, modalities, **config['data_options']['eval'])
-    else: val_ds = None
+        val_ds_ct = dataset.eval_ds(data_path, modalities=ct_modalities, **config['data_options']['eval'])
+        val_ds_mri = dataset.eval_ds(data_path, modalities=mri_modalities, **config['data_options']['eval'])
+    else: 
+        val_ds_ct = None
+        val_ds_mri = None
+
+    #loading testing dataset
+    test_ds_ct = dataset.predict_ds(data_path, modalities=ct_modalities, **config['data_options']['test'])
+    test_ds_mri = dataset.predict_ds(data_path, modalities=mri_modalities, **config['data_options']['test'])
+
 
     tf.keras.backend.clear_session()
     
@@ -100,62 +114,48 @@ def train_stacked(
       keras.metrics.AUC(name='prc', curve='PR'), # precision-recall curve
     ]
 
-    model_initial = transfer_models.stacked_model()
-    print(model_initial.summary())
-
-    layer_dict = dict([(layer.name, layer) for layer in model_initial.layers])
-    print(layer_dict)
-
-    weights_path = '/home/maanvi/LAB/pre_trained_models/vgg16_weights_tf_dim_ordering_tf_kernels_notop.h5'
-    model_initial.load_weights(weights_path, by_name=True)
-
-    for i, layer in enumerate(model_initial.layers):
-        weigths = layer.get_weights()
-        model_initial.layers[i].set_weights(weigths)
-    
-    model = keras.Model(model_initial.input, outputs=model_initial.output)
-
-    features = []
-    for i in tqdm(ds):
-        image = np.expand_dims(i, axis=0)
-        featurePredict = model.predict(image)
-        features.append(featurePredict)
-    featuresArr = np.array(features)
-    featuresRes = np.reshape(featuresArr, (featuresArr.shape[0],
-                                        featuresArr.shape[2],
-                                        featuresArr.shape[3],
-                                        featuresArr.shape[4]    ))
-
-    featuresResXGB = np.reshape(featuresRes, (featuresRes.shape[0], featuresRes.shape[1]*featuresRes.shape[2]*featuresRes.shape[3]))
-
-
-
-
-
-
-    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=base_learning_rate),
-                loss=tf.keras.losses.BinaryCrossentropy(),
-                metrics=METRICS)
+    tf.keras.backend.clear_session()
+    num_neurons=1
+    base_learning_rate = 0.00001
     batch_size = config['data_options']['train']['batch_size']
     n_trainsteps = folders.count_samples(modalities,data_path,'train')['total']//batch_size
     n_valsteps = folders.count_samples(modalities,data_path,'val')['total']//batch_size
-
-    #n_trainsteps = 1
-    print("batchsize, trainsteps, valsteps")
-    print(batch_size, n_trainsteps, n_valsteps)
-    results = model.fit(
-        ds,
+    reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.2,
+                              patience=5, min_lr=base_learning_rate)
+    
+    #ct network
+    ct_model = transfer_models.stackedGB_net(classifier_neurons=num_neurons)
+    ct_model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=base_learning_rate),
+                loss=tf.keras.losses.BinaryCrossentropy(),
+                metrics=METRICS)
+    results = ct_model.fit(
+        ds_ct,
         batch_size = batch_size,
-        validation_data=val_ds,
+        validation_data=val_ds_ct,
         steps_per_epoch=n_trainsteps,
         epochs=max_steps,
         callbacks = [reduce_lr],
         verbose=1
+    )
+    ct_features = ct_model.predict(test_ds_ct)
 
+
+    #mri network
+    mri_model = transfer_models.stackedGB_net(classifier_neurons=num_neurons)
+    mri_model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=base_learning_rate),
+                loss=tf.keras.losses.BinaryCrossentropy(),
+                metrics=METRICS)
+    results = mri_model.fit(
+        ds_mri,
+        batch_size = batch_size,
+        validation_data=val_ds_mri,
+        steps_per_epoch=n_trainsteps,
+        epochs=max_steps,
+        callbacks = [reduce_lr],
+        verbose=1
     )
     
-    #predict
-    test_ds = dataset.predict_ds(data_path, modalities, **config['data_options']['test'])
+    
 
     loss, tp, fp, tn, fn, acc, precision, recall, AUC, prc = model.evaluate(test_ds)
     tp = int(tp)

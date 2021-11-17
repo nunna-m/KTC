@@ -178,39 +178,34 @@ class vgg16_net(Model):
         return x
 
 
-class stacked_model(Model):
+class stackedGB_net(Model):
     def __init__(
         self,
         activation='relu',
-        padding='same',
-        pool_size=(2,2),
-        strides=(2,2),
-        kernel_size=(3,3),
-        output_size=(224,224,3),
+        classifier_neurons=1,
         **kargs,
     ):
         super().__init__(**kargs)
+        self.base_model = tf.keras.applications.VGG16(input_shape=(224, 224, 3), include_top=False, weights='imagenet')
+        #self.base_model = add_regularization(self.base_model)
+        for self.layer in self.base_model.layers:
+            self.layer.trainable = False
         
-        self.imageInput = layers.Input(shape=output_size,
-                                    name='input_1')
-        self.conv1 = layers.Conv2D(64, kernel_size=kernel_size, activation=activation, padding=padding, name='block1_conv1')
-        self.conv2 = layers.Conv2D(64, kernel_size=kernel_size, activation=activation, padding=padding, name='block1_conv2')
-        self.maxpool1 = layers.MaxPool2D(pool_size=pool_size, strides=strides, name='block1_pool')
-
-        self.conv3 = layers.Conv2D(128, kernel_size=kernel_size, activation=activation, padding=padding, name='block2_conv1')
-        self.conv4 = layers.Conv2D(128, kernel_size=kernel_size, activation=activation, padding=padding, name='block2_conv2')
-        self.maxpool2 = layers.MaxPool2D(pool_size=pool_size, strides=strides, name='block2_pool')
+        self.last_layer = self.base_model.get_layer('block5_pool')
+        self.top_model = self.last_layer.output
+        self.gap = layers.GlobalAveragePooling2D()
+        self.dense1 = layers.Dense(512, activation=activation)
+        self.dropout = layers.Dropout(0.2)
+        self.dense2 = layers.Dense(256, activation=activation, name='penultimate')
+        self.dense3 = layers.Dense(classifier_neurons, activation='sigmoid')
         
     
     @tf.function
     def call(self, input_tensor, training=False):
-        x = input_tensor
-        #x = self.imageInput(input_tensor)
-        x = self.conv1(x)
-        x = self.conv2(x)
-        x = self.maxpool1(x)
-
-        x = self.conv3(x)
-        x = self.conv4(x)
-        x = self.maxpool2(x)
+        x = self.base_model(input_tensor)
+        x = self.gap(x)
+        x = self.dense1(x)
+        x = self.dense2(x)
+        x = self.dropout(x)
+        x = self.dense3(x)
         return x
