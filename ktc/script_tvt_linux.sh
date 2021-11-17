@@ -22,7 +22,6 @@ python3 -m pre split --whichos linux --path pre/paths.yaml --modalities ['tm','d
 python3 -m pre split --whichos linux --path pre/paths.yaml --modalities ['am','tm','dc']
 python3 -m pre split --whichos linux --path pre/paths.yaml --modalities ['am','tm','ec']
 python3 -m pre split --whichos linux --path pre/paths.yaml --modalities ['am','tm','pc']
-
 python3 -m pre split --whichos linux --path pre/paths.yaml --modalities ['am','tm']
 python3 -m pre split --whichos linux --path pre/paths.yaml --modalities ['dc','ec','pc']
 python3 -m pre split --whichos linux --path pre/paths.yaml --modalities ['am','tm','dc','ec','pc']

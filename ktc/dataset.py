@@ -260,9 +260,6 @@ def parse_subject(subject_path, output_size, modalities,tumor_region_only, decod
         ))
     
     assert same_named_slices, f'Not enough slices with same name in {subject_path}'
-    old_gathered_modalities = dict()
-    for temp in modalities:
-        old_gathered_modalities[temp] = gathered_modalities_paths[temp]
     
     for temp in modalities:
         gathered_modalities_paths[temp] = {k+'.png' for k in same_named_slices}

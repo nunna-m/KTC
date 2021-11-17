@@ -63,5 +63,3 @@ def count_samples(modalities, generalpath, split):
         'CCRCC':nf_cc,
         'total':nf_aml+nf_cc,
     }
-
-print(count_samples(['ec','tm'],'/home/maanvi/LAB/Datasets/kt_new_trainvaltest', 'val'))

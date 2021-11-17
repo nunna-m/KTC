@@ -167,6 +167,11 @@ def train(
     #predict
     test_ds = dataset.predict_ds(data_path, modalities, **config['data_options']['test'])
 
+    loss, tp, fp, tn, fn, acc, precision, recall, AUC, prc = model.evaluate(test_ds)
+    tp = int(tp)
+    fp = int(fp)
+    tn = int(tn)
+    fn = int(fn)
     print("test loss, test acc: ",model.evaluate(test_ds))
     print("{} ***********************************RUN DONE ***********************************".format(modalities))
 
@@ -183,21 +188,21 @@ def train(
     y_pred = model.predict(test_ds)
     y_pred_classes = y_pred.argmax(axis=-1)
     y_pred = np.squeeze(y_pred)
-    print(y_numpy.shape, y_pred.shape)
+    print(y_pred_classes)
     
     eval_metrics = {k:0 for k in colnames}
     roundoff = 3
     eval_metrics['Modalities'] = ' '.join(modalities)
     eval_metrics['#AML(no)'] = nf_aml
     eval_metrics['#CCRCC(yes)'] = nf_cc
-    eval_metrics['accuracy'] = np.round_(accuracy_score(y_numpy, y_pred_classes),roundoff)
+    eval_metrics['accuracy'] = np.round_(acc,roundoff)
+    eval_metrics['AUC'] = AUC
     plot_loss_acc(results, sendpath, metrics=METRICS)
-
-    eval_metrics = plot_roc(eval_metrics, y_numpy, y_pred, sendpath, roundoff)
-    eval_metrics = plot_confmat(eval_metrics, y_numpy, y_pred_classes, sendpath, roundoff)
-
-    eval_metrics['recall'] = np.round_((eval_metrics['TP'])/(eval_metrics['TP']+eval_metrics['FN']),roundoff)
-    eval_metrics['specificity'] = np.round_((eval_metrics['TN'])/(eval_metrics['TN']+eval_metrics['FP']),roundoff)
+    plot_roc(y_numpy, y_pred, sendpath)
+    f2 = plot_confmat(tp, fp, tn, fn, sendpath, roundoff)
+    eval_metrics['f2'] = np.round_(f2,roundoff)
+    eval_metrics['recall'] = np.round_((tp/(tp+fn),roundoff))
+    eval_metrics['specificity'] = np.round_(tn/(tn+fp),roundoff)
 
     print(eval_metrics)
 
@@ -212,11 +217,8 @@ def train(
     
     return results
 
-def plot_roc(eval_metrics, y_true, y_pred, path, roundoff):
+def plot_roc(y_true, y_pred, path):
     fpr, tpr, _ = roc_curve(y_true, y_pred)
-    roc_auc = auc(fpr, tpr)
-    eval_metrics['AUC'] = np.round_(roc_auc,roundoff)
-    print("AUC: ",roc_auc)
     fig = plt.figure()
     plt.plot(fpr, tpr)
     plt.xlim([0.0, 1.0])
@@ -226,38 +228,38 @@ def plot_roc(eval_metrics, y_true, y_pred, path, roundoff):
     plt.title('Receiver operating characteristic')
     plt.savefig(os.path.join(path,'roc.png'))
     plt.close(fig)
-
-    return eval_metrics
     
+def fbeta(tp, fp, tn, fn, beta=2.0):
+    squared = pow(beta, 2)
+    numerator = (1 + squared)*tp
+    denominator = ((1 + squared)*tp) + squared*fn + fp
+    return numerator/denominator
 
-def plot_confmat(eval_metrics, y_true, y_pred, path, roundoff):
-    f2 = fbeta_score(y_true, y_pred, beta=2.0)
-    print('f-beta: ',f2)
-    eval_metrics['f2'] = np.round_(f2,roundoff)
-    cf = confusion_matrix(y_true, y_pred)
+def plot_confmat(tp, fp, tn, fn, path, roundoff, beta=2.0):
+    f2 = fbeta(tp, fp, tn, fn, beta)
+    print('f2-score: ',f2)
+    cf = np.array([[tp,fn],
+            [fp, tn]])
     print(cf)
-    tn, fp, fn, tp = cf.ravel()
-    eval_metrics['TP'] = tp
-    eval_metrics['FP'] = fp
-    eval_metrics['FN'] = fn
-    eval_metrics['TN'] = tn
 
-    classes = ['AML', 'CCRCC']
+    classes = ['CCRCC','AML']
     title = "Confusion Matrix"
     fig = plt.figure()
     ax = fig.add_subplot(111)
     cax = ax.matshow(cf)
     plt.title('Confusion matrix of the classifier')
     fig.colorbar(cax)
+    ax.set_xticks([0,0,1])
+    ax.set_yticks([0,0,1])
     ax.set_xticklabels([''] + classes)
     ax.set_yticklabels([''] + classes)
     plt.xlabel('Predicted')
-    plt.ylabel('True')
+    plt.ylabel('Actual')
     plt.title(title)
     plt.savefig(os.path.join(path,'cf.png'))
     plt.close(fig)
 
-    return eval_metrics
+    return f2
 
 def plot_loss_acc(history, path, metrics):
     req = history.history
