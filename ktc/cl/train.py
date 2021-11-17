@@ -201,8 +201,8 @@ def train(
     plot_roc(y_numpy, y_pred, sendpath)
     f2 = plot_confmat(tp, fp, tn, fn, sendpath, roundoff)
     eval_metrics['f2'] = np.round_(f2,roundoff)
-    eval_metrics['recall'] = np.round_((tp/(tp+fn),roundoff))
-    eval_metrics['specificity'] = np.round_(tn/(tn+fp),roundoff)
+    eval_metrics['recall'] = np.round_((tp/(tp+fn)),roundoff)
+    eval_metrics['specificity'] = np.round_((tn/(tn+fp)),roundoff)
 
     print(eval_metrics)
 
