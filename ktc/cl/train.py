@@ -195,6 +195,10 @@ def train(
     eval_metrics['Modalities'] = ' '.join(modalities)
     eval_metrics['#AML(no)'] = nf_aml
     eval_metrics['#CCRCC(yes)'] = nf_cc
+    eval_metrics['TP'] = tp
+    eval_metrics['FP'] = fp
+    eval_metrics['TN'] = tn
+    eval_metrics['FN'] = fn
     eval_metrics['accuracy'] = np.round_(acc,roundoff)
     eval_metrics['AUC'] = AUC
     plot_loss_acc(results, sendpath, metrics=METRICS)
