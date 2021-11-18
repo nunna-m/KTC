@@ -112,7 +112,13 @@ def train(
     # print(results)
     tf.keras.backend.clear_session()
     num_neurons = 1
-    model = transfer_models.vgg16_net(classifier_neurons=num_neurons)
+    network = 'alex_net'
+    if network == 'alex_net':
+        model = transfer_models.alex_net(classifier_neurons=num_neurons)
+    if network == 'vgg_16':
+        model = transfer_models.vgg16_net(classifier_neurons=num_neurons)
+    if network == 'resnet':
+        model = transfer_models.res_net50(classifier_neurons=num_neurons)
     base_learning_rate = 0.00001
     decay = base_learning_rate / max_steps
     reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.2,
@@ -179,7 +185,7 @@ def train(
     nf_aml = folders.count_samples(modalities,data_path,'test')['AML']
     nf_cc = folders.count_samples(modalities,data_path,'test')['CCRCC']
     if os.path.isdir(save_path) and os.path.exists(save_path):
-        sendpath = os.path.join(save_path, 'graphs','_'.join(modalities))
+        sendpath = os.path.join(save_path, 'alex_net', 'graphs','_'.join(modalities))
         os.makedirs(sendpath, exist_ok=True)
     colnames = ['Modalities','#AML(no)','#CCRCC(yes)','AUC','TP','FP','TN','FN','recall','specificity','f2','accuracy']
     y_numpy = []
@@ -211,14 +217,14 @@ def train(
 
     print(eval_metrics)
 
-    metrics_path = os.path.join(save_path,'graphs','metrics.csv')
+    metrics_path = os.path.join(save_path,'alex_net','graphs','metrics.csv')
     if not os.path.exists(metrics_path):
         df = pd.DataFrame(columns=colnames)
         df = df.append(eval_metrics,ignore_index=True)
-        df.to_csv(os.path.join(save_path,'graphs','metrics.csv'))
+        df.to_csv(metrics_path)
     else:
         extra = pd.DataFrame([eval_metrics])
-        extra.to_csv(os.path.join(save_path,'graphs','metrics.csv'), mode='a', header=False)
+        extra.to_csv(metrics_path, mode='a', header=False)
     
     return results
 

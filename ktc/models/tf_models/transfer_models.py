@@ -80,6 +80,7 @@ class alex_net(Model):
         padding='same',
         activation='relu',
         dropout=0.5,
+        classifier_neurons=1,
         **kargs,
     ):
         super().__init__(**kargs)
@@ -109,7 +110,7 @@ class alex_net(Model):
         self.dense2 = layers.Dense(4096, activation=activation)
         self.dropout2 = layers.Dropout(rate=dropout)
         
-        self.dense3 = layers.Dense(1, activation='sigmoid')
+        self.dense3 = layers.Dense(classifier_neurons, activation='sigmoid')
     
     @tf.function
     def call(self, input_tensor, training=False):
@@ -156,6 +157,40 @@ class vgg16_net(Model):
         for self.layer in self.base_model.layers[:15]:
             self.layer.trainable = False
         for self.layer in self.base_model.layers[15:]:
+            self.layer.trainable = True
+        
+        self.last_layer = self.base_model.get_layer('block5_pool')
+        self.top_model = self.last_layer.output
+        self.gap = layers.GlobalAveragePooling2D()
+        self.dense1 = layers.Dense(512, activation=activation)
+        self.dropout = layers.Dropout(0.2)
+        self.dense2 = layers.Dense(256, activation=activation)
+        self.dense3 = layers.Dense(classifier_neurons, activation='sigmoid')
+        
+    
+    @tf.function
+    def call(self, input_tensor, training=False):
+        x = self.base_model(input_tensor)
+        x = self.gap(x)
+        x = self.dense1(x)
+        x = self.dense2(x)
+        x = self.dropout(x)
+        x = self.dense3(x)
+        return x
+
+class res_net50(Model):
+    def __init__(
+        self,
+        activation='relu',
+        classifier_neurons=1,
+        **kargs,
+    ):
+        super().__init__(**kargs)
+        self.base_model = tf.keras.applications.ResNet50(input_shape=(224, 224, 3), include_top=False, weights='imagenet')
+        #self.base_model = add_regularization(self.base_model)
+        for self.layer in self.base_model.layers[:26]:
+            self.layer.trainable = False
+        for self.layer in self.base_model.layers[26:]:
             self.layer.trainable = True
         
         self.last_layer = self.base_model.get_layer('block5_pool')
