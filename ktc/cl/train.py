@@ -293,7 +293,7 @@ def plot_loss_acc(history, path, network):
     fig = plt.figure()
     plt.plot(req[metric])
     plt.plot(req['val_'+metric])
-    plt.title('vgg16 fine tuning model '+metric)
+    plt.title(network+' fine tuning model '+metric)
     plt.xlabel('epoch')
     plt.legend(['train','val'], loc= 'upper left')
     plt.savefig(os.path.join(path,metric+'.png'))
