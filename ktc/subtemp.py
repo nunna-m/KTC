@@ -10,8 +10,8 @@ import cv2
 import sys
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 
-imgpath = '/home/maanvi/LAB/Datasets/sample_kt/pc/train/CCRCC/73142952/pc/1.png'
-labelpath = '/home/maanvi/LAB/Datasets/sample_kt/pc/train/CCRCC/73142952/pcL/1.png'
+imgpath = '/home/maanvi/LAB/Datasets/kt_new_trainvaltest/fold1/dc/train/AML/87137931/dc/1.png'
+labelpath = '/home/maanvi/LAB/Datasets/kt_new_trainvaltest/fold1/dc/train/AML/87137931/dcL/1.png'
 storepath = '/home/maanvi/Desktop/working/'
 orig_image = cv2.imread(imgpath)[:,:,0]
 (orig_height, orig_width) = cv2.imread(imgpath)[:,:,0].shape
