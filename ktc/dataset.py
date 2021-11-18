@@ -363,6 +363,16 @@ def get_tumor_boundingbox(imgpath, labelpath):
     else:
         y2 = y+diff_y+h
 
+
+    #gaussian standardizes only modality am
+    tmp = imgpath.rsplit('/',2)[1]
+    if tmp=='am':
+        mean, std = orig_image.mean(), orig_image.std()
+        orig_image = (orig_image - mean)/std
+        mean, std = orig_image.mean(), orig_image.std()
+        orig_image = np.clip(orig_image, -1.0, 1.0)
+        orig_image = (orig_image + 1.0) / 2.0
+        orig_image *= 255
     backup = orig_image[y1:y2,x1:x2]
     backup = cv2.resize(backup, (224,224),interpolation = cv2.INTER_LINEAR)
     backup = tf.convert_to_tensor(backup, dtype=tf.uint8)

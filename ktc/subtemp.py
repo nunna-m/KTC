@@ -10,8 +10,8 @@ import cv2
 import sys
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 
-imgpath = '/home/maanvi/LAB/Datasets/kidney_tumor_trainvaltest/am_tm/train/CCRCC/71335481/am/1.png'
-labelpath = '/home/maanvi/LAB/Datasets/kidney_tumor_trainvaltest/am_tm/train/CCRCC/71335481/amL/1.png'
+imgpath = '/home/maanvi/LAB/Datasets/sample_kt/pc/train/CCRCC/73142952/pc/1.png'
+labelpath = '/home/maanvi/LAB/Datasets/sample_kt/pc/train/CCRCC/73142952/pcL/1.png'
 storepath = '/home/maanvi/Desktop/working/'
 orig_image = cv2.imread(imgpath)[:,:,0]
 (orig_height, orig_width) = cv2.imread(imgpath)[:,:,0].shape
@@ -26,7 +26,7 @@ c = max(contours, key=cv2.contourArea)
 x, y, w, h = cv2.boundingRect(c)
 assert (w,h)<(224,224)
 assert (x,y)>=(0,0)
-const = 0.3
+const = 0.5
 diff_x = int(const*w)
 diff_y = int(const*h)
 if (x-diff_x)<0:
@@ -46,8 +46,18 @@ if (y+diff_y+h)>=orig_height:
 else:
     y2 = y+diff_y+h
 
+tmp = imgpath.rsplit('/',2)[1]
+print(tmp)
+if tmp=='am':
+    mean, std = orig_image.mean(), orig_image.std()
+    orig_image = (orig_image - mean)/std
+    mean, std = orig_image.mean(), orig_image.std()
+    orig_image = np.clip(orig_image, -1.0, 1.0)
+    orig_image = (orig_image + 1.0) / 2.0
+    orig_image *= 255
+    print('done gaussian stand')
 backup = orig_image[y1:y2,x1:x2]
 backup = cv2.resize(backup, (224,224),interpolation = cv2.INTER_LINEAR)
-cv2.imwrite(storepath+'_cropped_new_0.3.png',backup)
+cv2.imwrite(storepath+'withoutgauss_cropped_new_0.3.png',backup)
 
 

@@ -18,7 +18,6 @@ from datetime import datetime
 
 # external
 import tensorflow as tf
-import tensorflow_decision_forests as tfdf
 from tensorflow import keras
 from matplotlib import pyplot as plt
 from sklearn.metrics import roc_curve, auc, confusion_matrix, fbeta_score, precision_score, recall_score, accuracy_score
