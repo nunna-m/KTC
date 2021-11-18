@@ -1,9 +1,9 @@
 data_options:
     remote:
         data_path:
-            /kw_resources/datasets/kt_new_trainvaltest
+            /kw_resources/datasets/kt_new_trainvaltest_fold2
         save_path:
-            /kw_resources/results/kidney_tumor
+            /kw_resources/results/kidney_tumor/am_fold2
     linux:
         data_path:
             /home/maanvi/LAB/Datasets/kt_new_trainvaltest
