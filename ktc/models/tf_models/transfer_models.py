@@ -193,8 +193,6 @@ class res_net50(Model):
         for self.layer in self.base_model.layers[26:]:
             self.layer.trainable = True
         
-        self.last_layer = self.base_model.get_layer('block5_pool')
-        self.top_model = self.last_layer.output
         self.gap = layers.GlobalAveragePooling2D()
         self.dense1 = layers.Dense(512, activation=activation)
         self.dropout = layers.Dropout(0.2)

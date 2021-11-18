@@ -3,6 +3,8 @@ CLI for train command
 '''
 
 import os
+
+from numpy.lib.npyio import save
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 from ktc.utils import get, store, load, dump
@@ -38,6 +40,8 @@ tensorboard_callback = keras.callbacks.TensorBoard(log_dir=logsdir)
 def train(
     whichos,
     config,
+    fold,
+    network,
     modalities,
     max_steps,
     early_stop_steps=None,
@@ -58,6 +62,8 @@ def train(
             This option accepts arbitrary number of configs.
             If a list is specified, the first one is considered
             as a "main" config, and the other ones will overwrite the content
+        fold (int): the fold representing random creation of train/val/test
+        network (list[str]): which neural network to use
         modalities (list[str]): the modalites being used
         max_steps (int): max training steps
         early_stop_steps: steps to train without improvements
@@ -74,8 +80,13 @@ def train(
     modalities = sorted(modalities, reverse=False)
     save_path = config['data_options'][whichos]['save_path']
     data_path = config['data_options'][whichos]['data_path']
+    fold = str(fold)
+    network = str(network[0])
+
+    data_path = os.path.join(data_path, 'fold'+fold)
+    save_path = os.path.join(save_path, 'fold'+fold, network)
     dump.dump_options(
-        os.path.join(save_path, 'options.yaml'),
+        os.path.join(save_path, 'options_fold'+fold+'_'+network+'.yaml'),
         avoid_overwrite=True,
         config=config,
         save_path=save_path,
@@ -112,13 +123,15 @@ def train(
     # print(results)
     tf.keras.backend.clear_session()
     num_neurons = 1
-    network = 'alex_net'
-    if network == 'alex_net':
+    #network = 'cnn'
+    if network == 'alexnet':
         model = transfer_models.alex_net(classifier_neurons=num_neurons)
-    if network == 'vgg_16':
+    if network == 'vgg16':
         model = transfer_models.vgg16_net(classifier_neurons=num_neurons)
     if network == 'resnet':
         model = transfer_models.res_net50(classifier_neurons=num_neurons)
+    if network == 'cnn':
+        model = vanillacnn.CNN(activation='relu',num_classes=1)
     base_learning_rate = 0.00001
     decay = base_learning_rate / max_steps
     reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.2,
@@ -185,7 +198,7 @@ def train(
     nf_aml = folders.count_samples(modalities,data_path,'test')['AML']
     nf_cc = folders.count_samples(modalities,data_path,'test')['CCRCC']
     if os.path.isdir(save_path) and os.path.exists(save_path):
-        sendpath = os.path.join(save_path, 'alex_net', 'graphs','_'.join(modalities))
+        sendpath = os.path.join(save_path, '_'.join(modalities))
         os.makedirs(sendpath, exist_ok=True)
     colnames = ['Modalities','#AML(no)','#CCRCC(yes)','AUC','TP','FP','TN','FN','recall','specificity','f2','accuracy']
     y_numpy = []
@@ -208,7 +221,7 @@ def train(
     eval_metrics['FN'] = fn
     eval_metrics['accuracy'] = np.round_(acc,roundoff)
     eval_metrics['AUC'] = AUC
-    plot_loss_acc(results, sendpath, metrics=METRICS)
+    plot_loss_acc(results, sendpath, network=network)
     plot_roc(y_numpy, y_pred, sendpath)
     f2 = plot_confmat(tp, fp, tn, fn, sendpath, roundoff)
     eval_metrics['f2'] = np.round_(f2,roundoff)
@@ -217,7 +230,7 @@ def train(
 
     print(eval_metrics)
 
-    metrics_path = os.path.join(save_path,'alex_net','graphs','metrics.csv')
+    metrics_path = os.path.join(save_path,'metrics.csv')
     if not os.path.exists(metrics_path):
         df = pd.DataFrame(columns=colnames)
         df = df.append(eval_metrics,ignore_index=True)
@@ -272,7 +285,7 @@ def plot_confmat(tp, fp, tn, fn, path, roundoff, beta=2.0):
 
     return f2
 
-def plot_loss_acc(history, path, metrics):
+def plot_loss_acc(history, path, network):
     req = history.history
     
     #plot training and val loss
@@ -291,7 +304,7 @@ def plot_loss_acc(history, path, metrics):
     fig2 = plt.figure()
     plt.plot(req[metric])
     plt.plot(req['val_'+metric])
-    plt.title('vgg16 fine tuning model '+metric)
+    plt.title(network+' fine tuning model '+metric)
     plt.xlabel('epoch')
     plt.legend(['train','val'], loc= 'upper left')
     plt.savefig(os.path.join(path,metric+'.png'))
