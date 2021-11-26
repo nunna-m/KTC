@@ -64,4 +64,4 @@ def count_samples(modalities, generalpath, split):
         'total':nf_aml+nf_cc,
     }
 
-print(count_samples(['dc'],'/home/maanvi/LAB/Datasets/kt_new_trainvaltest/fold1', 'train'))
+# print(count_samples(['dc'],'/home/maanvi/LAB/Datasets/kt_new_trainvaltest/fold1', 'train'))
