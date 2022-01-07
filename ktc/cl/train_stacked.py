@@ -130,7 +130,7 @@ def train_stacked(
     
     vgg_model = tf.keras.applications.VGG16(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
     for layer in vgg_model.layers:
-	    layer.trainable = False
+        layer.trainable = False
     vgg_model.summary()  #Trainable parameters will be 0
 
     # vgg_model.fit(
