@@ -94,119 +94,104 @@ def train(
         data_path=data_path,
     )
     print(save_path,data_path)
-    
-    ds = dataset.train_ds(data_path, modalities, **config['data_options']['train'])
-    if validate:
-        #assert val_data_path is not None
-        val_ds = dataset.eval_ds(data_path, modalities, **config['data_options']['eval'])
-    else: val_ds = None
+    if split_CTMRI:
+        ct_modalities = [modal for modal in modalities if 'c' in modal]
+        ct_trainds = dataset.train_ds(data_path, ct_modalities, **config['data_options']['train'])
+        ct_valds = dataset.eval_ds(data_path, ct_modalities, **config['data_options']['eval'])
+        ct_testds = dataset.predict_ds(data_path, ct_modalities, **config['data_options']['test'])
 
-    if visualize:
-        visualization = {
-            'train': dataset.eval_ds(data_path, modalities, **config['data_options']['eval'], include_meta=True),
-            'validation': dataset.eval_ds(val_data_path, modalities,**config['data_options']['eval'], include_meta=True),
-        }
-    else: visualization = {}
-    #model = engine.TFKerasModel(config)
-    # model = vanillacnn.CNN(activation='relu',num_classes=2)
-    # model.compile(
-    #     loss=tf.keras.losses.CategoricalCrossentropy(),
-    #     metrics=tf.keras.metrics.CategoricalAccuracy(),
-    #     optimizer=tf.keras.optimizers.Adam(),
-    # )
-    # results = model.fit(
-    #     ds,
-    #     validation_data=val_ds,
-    #     steps_per_epoch=1,
-    #     epochs=100,
+        tf.keras.backend.clear_session()
+        num_neurons = 1
+        base_learning_rate = 0.00001
+        decay = base_learning_rate / max_steps
+        reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.2,
+                                patience=5, min_lr=base_learning_rate)
+        batch_size = config['data_options']['train']['batch_size']
+        METRICS = [
+            keras.metrics.TruePositives(name='tp'),
+            keras.metrics.FalsePositives(name='fp'),
+            keras.metrics.TrueNegatives(name='tn'),
+            keras.metrics.FalseNegatives(name='fn'), 
+            keras.metrics.BinaryAccuracy(name='accuracy'),
+            keras.metrics.Precision(name='precision'),
+            keras.metrics.Recall(name='recall'),
+            keras.metrics.AUC(name='auc'),
+            keras.metrics.AUC(name='prc', curve='PR'), # precision-recall curve
+            ]
+        
 
-    # )
-    # print(results)
-    tf.keras.backend.clear_session()
-    num_neurons = 1
-    #network = 'cnn'
-    if network == 'alexnet':
-        model = transfer_models.alex_net(classifier_neurons=num_neurons)
-    if network == 'vgg16':
-        model = transfer_models.vgg16_net(classifier_neurons=num_neurons)
-    if network == 'resnet':
-        model = transfer_models.res_net50(classifier_neurons=num_neurons)
-    if network == 'cnn':
-        model = vanillacnn.CNN(activation='relu',num_classes=1)
-    base_learning_rate = 0.00001
-    decay = base_learning_rate / max_steps
-    reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.2,
-                              patience=5, min_lr=base_learning_rate)
-    early_stopping = tf.keras.callbacks.EarlyStopping(
-                    monitor='val_loss',
-                    patience=20,
-                    mode='min',
-                    restore_best_weights=True)
-    def lr_time_based_decay(epoch, lr):
-        return lr * 1 / (1+decay*epoch)
-    
-    METRICS = [
-      keras.metrics.TruePositives(name='tp'),
-      keras.metrics.FalsePositives(name='fp'),
-      keras.metrics.TrueNegatives(name='tn'),
-      keras.metrics.FalseNegatives(name='fn'), 
-      keras.metrics.BinaryAccuracy(name='accuracy'),
-      keras.metrics.Precision(name='precision'),
-      keras.metrics.Recall(name='recall'),
-      keras.metrics.AUC(name='auc'),
-      keras.metrics.AUC(name='prc', curve='PR'), # precision-recall curve
-    ]
+        # ct_model = transfer_models.vgg16_net(classifier_neurons=num_neurons)
+        # ct_model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=base_learning_rate),
+        #         loss=tf.keras.losses.BinaryCrossentropy(),
+        #         metrics=METRICS)
+        
+        # ct_n_trainsteps = folders.count_samples(ct_modalities,data_path,'train')['total']//batch_size
+        # ct_n_valsteps = folders.count_samples(ct_modalities,data_path,'val')['total']//batch_size
+        # print("batchsize, trainsteps, valsteps")
+        # print(batch_size, ct_n_trainsteps, ct_n_valsteps)
 
-    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=base_learning_rate),
+        # ct_results = ct_model.fit(ct_trainds,
+        # batch_size = batch_size,
+        # validation_data=ct_valds,
+        # steps_per_epoch=ct_n_trainsteps,
+        # epochs=max_steps,
+        # callbacks = [reduce_lr, TqdmCallback(verbose=2)],
+        # verbose=0,
+        # )
+        
+        # save_results_and_plot(model=ct_model, testData=ct_testds,modalities=ct_modalities, dataPath=data_path, savePath=save_path, fit_results=ct_results, network=network)
+
+
+
+        mri_modalities = [modal for modal in modalities if 'm' in modal]
+        mri_trainds = dataset.train_ds(data_path, mri_modalities, **config['data_options']['train'])
+        mri_valds = dataset.eval_ds(data_path, mri_modalities, **config['data_options']['eval'])
+        mri_testds = dataset.predict_ds(data_path, mri_modalities, **config['data_options']['test'])
+        mri_model = transfer_models.vgg16_net(classifier_neurons=num_neurons)
+        mri_model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=base_learning_rate),
                 loss=tf.keras.losses.BinaryCrossentropy(),
                 metrics=METRICS)
-    batch_size = config['data_options']['train']['batch_size']
-    n_trainsteps = folders.count_samples(modalities,data_path,'train')['total']//batch_size
-    n_valsteps = folders.count_samples(modalities,data_path,'val')['total']//batch_size
 
-    #n_trainsteps = 1
-    print("batchsize, trainsteps, valsteps")
-    print(batch_size, n_trainsteps, n_valsteps)
-    results = model.fit(
-        ds,
+        mri_n_trainsteps = folders.count_samples(mri_modalities,data_path,'train')['total']//batch_size
+        mri_n_valsteps = folders.count_samples(mri_modalities,data_path,'val')['total']//batch_size
+        print("batchsize, trainsteps, valsteps")
+        print(batch_size, mri_n_trainsteps, mri_n_valsteps)
+
+        mri_results = mri_model.fit(mri_trainds,
         batch_size = batch_size,
-        validation_data=val_ds,
-        steps_per_epoch=n_trainsteps,
+        validation_data=mri_valds,
+        steps_per_epoch=mri_n_trainsteps,
         epochs=max_steps,
         callbacks = [reduce_lr, TqdmCallback(verbose=2)],
         verbose=0,
-    )
-    
-    # dump.dump_train_results(
-    #     os.path.join(save_path, 'results.pkl'),
-    #     results,
-    #     format_='pickle',
-    # )
+        )
+        
+        save_results_and_plot(model=mri_model, testData=mri_testds,modalities=mri_modalities, dataPath=data_path, savePath=save_path, fit_results=mri_results, network=network)
+        
 
-    #predict
-    test_ds = dataset.predict_ds(data_path, modalities, **config['data_options']['test'])
 
-    #print(list(test_ds.as_numpy_iterator()))
+    return mri_results
 
-    loss, tp, fp, tn, fn, acc, precision, recall, AUC, prc = model.evaluate(test_ds)
+def save_results_and_plot(model, testData, modalities, dataPath, savePath, fit_results, network):
+    loss, tp, fp, tn, fn, acc, precision, recall, AUC, prc = model.evaluate(testData)
     tp = int(tp)
     fp = int(fp)
     tn = int(tn)
     fn = int(fn)
-    print("test loss, test acc: ",model.evaluate(test_ds))
+    print("test loss, test acc: ",model.evaluate(testData))
     print("{} ***********************************RUN DONE ***********************************".format(modalities))
 
-    nf_aml = folders.count_samples(modalities,data_path,'test')['AML']
-    nf_cc = folders.count_samples(modalities,data_path,'test')['CCRCC']
-    if os.path.isdir(save_path) and os.path.exists(save_path):
-        sendpath = os.path.join(save_path, '_'.join(modalities))
+    nf_aml = folders.count_samples(modalities,dataPath,'test')['AML']
+    nf_cc = folders.count_samples(modalities,dataPath,'test')['CCRCC']
+    if os.path.isdir(savePath) and os.path.exists(savePath):
+        sendpath = os.path.join(savePath,'stacked_level0', '_'.join(modalities))
         os.makedirs(sendpath, exist_ok=True)
     colnames = ['Modalities','#AML(no)','#CCRCC(yes)','AUC','TP','FP','TN','FN','recall','specificity','f2','accuracy']
     y_numpy = []
-    for iter in test_ds.as_numpy_iterator():
+    for iter in testData.as_numpy_iterator():
         y_numpy.append(iter[1])
     y_numpy = y_numpy[0]
-    y_pred = model.predict(test_ds)
+    y_pred = model.predict(testData)
     y_pred_classes = y_pred.argmax(axis=-1)
     y_pred = np.squeeze(y_pred)
     print(y_pred_classes)
@@ -222,7 +207,7 @@ def train(
     eval_metrics['FN'] = fn
     eval_metrics['accuracy'] = np.round_(acc,roundoff)
     eval_metrics['AUC'] = AUC
-    plot_loss_acc(results, sendpath, network=network)
+    plot_loss_acc(fit_results, sendpath, network=network)
     plot_roc(y_numpy, y_pred, sendpath)
     f2 = plot_confmat(tp, fp, tn, fn, sendpath, roundoff)
     eval_metrics['f2'] = np.round_(f2,roundoff)
@@ -231,7 +216,7 @@ def train(
 
     print(eval_metrics)
 
-    metrics_path = os.path.join(save_path,'metrics.csv')
+    metrics_path = os.path.join(savePath,'stacked_level0','metrics.csv')
     if not os.path.exists(metrics_path):
         df = pd.DataFrame(columns=colnames)
         df = df.append(eval_metrics,ignore_index=True)
@@ -239,9 +224,6 @@ def train(
     else:
         extra = pd.DataFrame([eval_metrics])
         extra.to_csv(metrics_path, mode='a', header=False)
-    
-    return results
-    
 
 def plot_roc(y_true, y_pred, path):
     fpr, tpr, _ = roc_curve(y_true, y_pred)

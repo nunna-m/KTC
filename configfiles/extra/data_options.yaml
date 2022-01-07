@@ -1,4 +1,5 @@
 data_options:
+    split_CTMRI: True
     remote:
         data_path:
             /kw_resources/datasets/kt_new_trainvaltest
