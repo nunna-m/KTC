@@ -37,7 +37,7 @@ from ktc.models.tf_models import transfer_models, vanillacnn
 logsdir = "logs/fit/transfer_learning/" + datetime.now().strftime("%m%d-%H%M")
 tensorboard_callback = keras.callbacks.TensorBoard(log_dir=logsdir)
 
-def train(
+def split_train(
     whichos,
     config,
     fold,

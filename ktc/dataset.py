@@ -41,6 +41,8 @@ def train_ds(
         random_shear_img: {},
     }
     traindir = os.path.join(data_root,'_'.join(modalities),'train')
+    print(data_root, modalities)
+    print("TRAINDIR: ",traindir)
     dataset = load_raw(
         traindir,
         modalities=modalities,
@@ -71,6 +73,7 @@ def eval_ds(
     tumor_region_only=False,
 ):
     evaldir = os.path.join(data_root,'_'.join(modalities),'val')
+    print("DYING here in eval")
     ds = load_raw(
         evaldir,
         modalities=modalities,
@@ -79,6 +82,7 @@ def eval_ds(
     )
     ds = ds.batch(batch_size)
     ds = ds.prefetch(tf.data.experimental.AUTOTUNE)
+    print("alive in EVAL")
     return ds
 
 def predict_ds(data_root,
@@ -87,14 +91,16 @@ def predict_ds(data_root,
          output_size=(224,224),
          tumor_region_only=False):
     testdir = os.path.join(data_root,'_'.join(modalities),'test')
+    print("DYING here in test")
     ds = load_raw(testdir,modalities=modalities, output_size=output_size, tumor_region_only=tumor_region_only)
     ds = ds.batch(batch_size)
+    print("ALIVE here in test")
     return ds
 
 def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,224), tumor_region_only=False, dtype=tf.float32):
     
     training_subject_paths = glob.glob(os.path.join(traindir,*'*'*2))
-    #print(training_subject_paths)
+    print("Training subject paths: ",training_subject_paths)
     ds = tf.data.Dataset.from_tensor_slices(training_subject_paths)
     
     label_ds = ds.interleave(
@@ -162,6 +168,7 @@ def tf_crop_bounding_box(image, label, output_size):
 
 def tf_combine_labels(subject_path, modalities,return_type='array'):
     return_type  =return_type.lower()
+    print(subject_path, modalities)
     modality = modalities[0]
     if return_type == 'array':
         return tf.py_function(
@@ -176,6 +183,7 @@ def tf_combine_labels(subject_path, modalities,return_type='array'):
             modalities=modalities, return_type='array')
         )
     else: raise NotImplementedError
+
 
 def get_label(subject, modality):
     if isinstance(subject, str): 
@@ -365,7 +373,7 @@ def get_tumor_boundingbox(imgpath, labelpath):
 
 
     #gaussian standardizes only modality am
-    tmp = imgpath.rsplit('/',2)[1]
+    tmp = imgpath.rsplit(os.path.sep,2)[1]
     if tmp=='am':
         mean, std = orig_image.mean(), orig_image.std()
         orig_image = (orig_image - mean)/std

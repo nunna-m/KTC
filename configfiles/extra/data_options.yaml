@@ -10,6 +10,11 @@ data_options:
             /home/maanvi/LAB/Datasets/kt_new_trainvaltest
         save_path:
             /home/maanvi/LAB/results/kidney_tumor
+    windows:
+        data_path:
+            D:\01_Maanvi\LABB\datasets\kt_new_trainvaltest
+        save_path:
+            D:\01_Maanvi\LABB\results\kidney_tumor
     train:
         batch_size: 32
         buffer_size: 1024

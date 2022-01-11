@@ -7,7 +7,6 @@ import os
 import tempfile
 import pdb
 import numpy as np
-import xgboost as xgb
 
 # external
 import tensorflow as tf

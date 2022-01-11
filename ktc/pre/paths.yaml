@@ -1,9 +1,9 @@
 os:
   windows:
     data_root:
-      'D:\01_Maanvi\LABB\datasets\kidney_tumor'
+      'D:\01_Maanvi\LABB\datasets\kt_new'
     after_split_path:
-      'D:\01_Maanvi\LABB\datasets\kidney_tumor_trainvaltest'
+      'D:\01_Maanvi\LABB\datasets\kt_new_trainvaltest'
   linux:
     data_root:
       '/home/maanvi/LAB/Datasets/kt_new'

@@ -1,8 +1,8 @@
-connected-components-3d
 tensorflow==2.4.0
+numpy==1.19.2
+connected-components-3d
 tensorflow-addons
 matplotlib
-numpy==1.19.2
 protobuf
 regex
 pandas
@@ -15,5 +15,3 @@ tensorboard_plugin_profile
 ruamel.yaml
 scipy
 scikit-learn
-xgboost
-tensorflow_decision_forests
