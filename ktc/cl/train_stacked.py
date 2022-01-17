@@ -98,7 +98,7 @@ def train_stacked(
             os.makedirs(testdata_filename, exist_ok=True)
             tf.keras.backend.clear_session()
             num_neurons = 2
-            n_trainsteps = folders.count_samples(modals,data_path,'train')['total']//batch_size
+            n_trainsteps = folders.count_samples(modalities,data_path,'train')['total']//batch_size
             model = vanillacnn.CNN(classifier_activation='softmax',num_classes=num_neurons)
             model.compile(
                 optimizer=tf.keras.optimizers.Adam(learning_rate=base_learning_rate),
