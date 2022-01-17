@@ -10,26 +10,16 @@ import numpy as np
 path = r'D:\\01_Maanvi\\LABB\\datasets\\kt_new_trainvaltest\\fold1\\am_dc_ec_pc_tm'
 paths = {'AML':list(), 'CCRCC':list()}
 all_classes_path = glob.glob(path+'/*/*/*')
-#print(all_classes_path)
 
 for subject in all_classes_path:
     subjectCopy = subject[:]
     clas = subjectCopy.rsplit(os.path.sep, 2)[-2]
     paths[clas].append(subject)
 
-# with open(os.path.join(path,'allSubjectPaths.yaml'),'w') as file:
-#     yaml.dump(paths,file)
-
-clas_data = dict()
-for clas in paths:
-   # print(clas, len(paths[clas]))
-    clas_data[clas] = {'train_len':int(0.7*len(paths[clas]))}
-    clas_data[clas]['test_len']=len(paths[clas]) - clas_data[clas]['train_len']
-    clas_data[clas]['num'] = len(paths[clas])
+with open(os.path.join(path,'allSubjectPaths.yaml'),'w') as file:
+    yaml.dump(paths,file)
 
 k5 = KFold(n_splits=5, shuffle=False)
-
-
 train_full = {0:list(),1:list(),2:list(),3:list(),4:list()}
 test_full = {0:list(),1:list(),2:list(),3:list(),4:list()}
 for clas in ['AML', 'CCRCC']:
@@ -50,7 +40,3 @@ for i in range(5):
             'test':new_test_full}
     with open(os.path.join(path,'allSubjectPaths{}.yaml'.format(i)),'w') as file:
         yaml.dump(store,file)
-
-    
-
-#print(clas_data)
