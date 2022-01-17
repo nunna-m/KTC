@@ -84,8 +84,7 @@ def train_stacked(
     elif method=='MRI':
         letter='m'
     fold_acc = []
-    #for i in range(N_FOLDS):
-    for i in [3,4]:
+    for i in range(N_FOLDS):
         send_path = folds_path+str(i)+'.yaml'
         modals = [modal for modal in modalities if modal.endswith(letter)]
         train_ds = dataset.train_ds(send_path, modals, **config['data_options']['train'])
