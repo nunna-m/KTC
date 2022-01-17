@@ -8,7 +8,7 @@ data_options:
         fc
     remote:
         data_path:
-            /kw_resources/datasets/kt_new_trainvaltest
+            /kw_resources/datasets/kt_new_trainvaltest/fold1
         save_path:
             /kw_resources/results/kidney_tumor
         folds_path:
@@ -17,7 +17,7 @@ data_options:
           /kw_resources/results/kidney_tumor/stacked/fold
     linux:
         data_path:
-            /home/maanvi/LAB/Datasets/kt_new_trainvaltest
+            /home/maanvi/LAB/Datasets/kt_new_trainvaltest/fold1
         save_path:
             /home/maanvi/LAB/results/kidney_tumor
         folds_path:
