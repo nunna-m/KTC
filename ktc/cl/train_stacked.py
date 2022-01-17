@@ -1,3 +1,4 @@
+from audioop import avg
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
@@ -82,58 +83,68 @@ def train_stacked(
         letter='c'
     elif method=='MRI':
         letter='m'
-    for i in range(N_FOLDS):
+    fold_acc = []
+    #for i in range(N_FOLDS):
+    for i in [3,4]:
         send_path = folds_path+str(i)+'.yaml'
         modals = [modal for modal in modalities if modal.endswith(letter)]
         train_ds = dataset.train_ds(send_path, modals, **config['data_options']['train'])
         test_ds = dataset.predict_ds(send_path, modals, **config['data_options']['test'])
         
-        if level_0=='cnn':
-            cvFold = str(i)
-            weights_filename = os.path.join(save_models_here+cvFold,method,'weights/')
-            preds_filename = os.path.join(save_models_here+cvFold,method,'predictions/')
-            testdata_filename = os.path.join(save_models_here+cvFold,method,'testdata/')
-            os.makedirs(weights_filename, exist_ok=True)
-            os.makedirs(preds_filename, exist_ok=True)
-            os.makedirs(testdata_filename, exist_ok=True)
-            tf.keras.backend.clear_session()
-            num_neurons = 2
-            n_trainsteps = folders.count_samples(modalities,data_path,'train')['total']//batch_size
+        cvFold = str(i)
+        weights_filename = os.path.join(save_models_here+cvFold,level_0,method,'weights/')
+        preds_filename = os.path.join(save_models_here+cvFold,level_0,method,'predictions/')
+        testdata_filename = os.path.join(save_models_here+cvFold,level_0,method,'testdata/')
+        os.makedirs(weights_filename, exist_ok=True)
+        os.makedirs(preds_filename, exist_ok=True)
+        os.makedirs(testdata_filename, exist_ok=True)
+        tf.keras.backend.clear_session()
+        num_neurons = 2
+        n_trainsteps = folders.count_samples(modalities,data_path,'train')['total']//batch_size
+        if level_0 == 'cnn':
             model = vanillacnn.CNN(classifier_activation='softmax',num_classes=num_neurons)
-            model.compile(
-                optimizer=tf.keras.optimizers.Adam(learning_rate=base_learning_rate),
-                loss=tf.keras.losses.CategoricalCrossentropy(),
-                metrics=METRICS,
-            )
-            results = model.fit(
-                train_ds,
-                batch_size = batch_size,
-                steps_per_epoch=n_trainsteps,
-                epochs=max_steps,
-                callbacks = [TqdmCallback(verbose=2)],
-                verbose=0,
-            )
-            model.save_weights(weights_filename)
-            print('Saved into: %s'%weights_filename)
-            print("test loss, test acc: ",model.evaluate(test_ds))           
+        elif level_0 == 'vgg16':
+            model = transfer_models.vgg16_net(classifier_activation='softmax',classifier_neurons=num_neurons)
+        model.compile(
+            optimizer=tf.keras.optimizers.Adam(learning_rate=base_learning_rate),
+            loss=tf.keras.losses.CategoricalCrossentropy(),
+            metrics=METRICS,
+        )
+        results = model.fit(
+            train_ds,
+            batch_size = batch_size,
+            steps_per_epoch=n_trainsteps,
+            epochs=max_steps,
+            callbacks = [TqdmCallback(verbose=2)],
+            verbose=0,
+        )
+        model.save_weights(weights_filename)
+        
 
-            x_test_numpy = []
-            y_test_numpy = []
-            for iter in test_ds.as_numpy_iterator():
-                x_test_numpy.append(iter[0])
-                y_test_numpy.append(iter[1])
+        x_test_numpy = []
+        y_test_numpy = []
+        for iter in test_ds.as_numpy_iterator():
+            x_test_numpy.append(iter[0])
+            y_test_numpy.append(iter[1])
 
-            # x_test = np.concatenate([x_test_numpy[0],x_test_numpy[1]])
-            # y_test = np.concatenate([y_test_numpy[0],y_test_numpy[1]])
-            x_test = x_test_numpy[0]
-            y_test = y_test_numpy[0]
-            np.save(testdata_filename+'X.npy',x_test)            
-            np.save(testdata_filename+'y.npy',y_test)
-            numpy_ypred = model.predict(x_test)
-            np.save(preds_filename+'yhat.npy',numpy_ypred)
-            
-            del model
-            del results
+        # x_test = np.concatenate([x_test_numpy[0],x_test_numpy[1]])
+        # y_test = np.concatenate([y_test_numpy[0],y_test_numpy[1]])
+        x_test = x_test_numpy[0]
+        y_test = y_test_numpy[0]
+        np.save(testdata_filename+'X.npy',x_test)            
+        np.save(testdata_filename+'y.npy',y_test)
+        numpy_ypred = model.predict(x_test)
+        np.save(preds_filename+'yhat.npy',numpy_ypred)
+        loss, tp, fp, tn, fn, acc, precision, recall, AUC, prc = model.evaluate(test_ds)
+        print('Saved into: %s'%weights_filename)
+        print("test loss, test acc: ",loss, acc)           
+        fold_acc.append(acc)
+        del model
+        del results
+    avg_acc = np.array(fold_acc).mean()
+    print("$$$$$$$$$$$$$$$$$$$$$$$$$")
+    print("AVG ACC: {}".format(avg_acc))
+    print("$$$$$$$$$$$$$$$$$$$$$$$$$")
     return  
 
 
