@@ -12,7 +12,7 @@ data_options:
         save_path:
             /kw_resources/results/kidney_tumor
         folds_path:
-            /kw_resources/datasets/kt_new_trainvaltest/fold2/am_dc_ec_pc_tm/allSubjectPaths
+            /kw_resources/datasets/kt_new_trainvaltest/fold1/am_dc_ec_pc_tm/allSubjectPaths
         save_models_here:
           /kw_resources/results/kidney_tumor/stacked/fold
     linux:
@@ -21,7 +21,7 @@ data_options:
         save_path:
             /home/maanvi/LAB/results/kidney_tumor
         folds_path:
-            /home/maanvi/LAB/Datasets/kt_new_trainvaltest/fold2/am_dc_ec_pc_tm/allSubjectPaths
+            /home/maanvi/LAB/Datasets/kt_new_trainvaltest/fold1/am_dc_ec_pc_tm/allSubjectPaths
         save_models_here:
             /home/maanvi/LAB/results/kidney_tumor/stacked/fold
     windows:
