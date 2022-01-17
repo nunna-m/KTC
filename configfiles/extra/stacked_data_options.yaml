@@ -3,7 +3,7 @@ data_options:
     modalities: ['am', 'dc', 'ec', 'pc', 'tm']
     network_info:
       level_0:
-        vgg16
+        cnn
       level_1:
         fc
     remote:
