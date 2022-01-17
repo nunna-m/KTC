@@ -3,10 +3,7 @@ CLI for train command
 '''
 
 import os
-
-from numpy.lib.npyio import save
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-
 from ktc.utils import get, store, load, dump
 from ktc import dataset
 
@@ -154,7 +151,7 @@ def train(
       keras.metrics.Precision(name='precision'),
       keras.metrics.Recall(name='recall'),
       keras.metrics.AUC(name='auc'),
-      keras.metrics.AUC(name='prc', curve='PR'), # precision-recall curve
+      keras.metrics.AUC(name='prc', curve='PR'), 
     ]
 
     model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=base_learning_rate),

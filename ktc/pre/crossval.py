@@ -6,15 +6,26 @@ import glob
 from sklearn.model_selection import KFold
 import numpy as np
 
-def crossvalDataGen(modalityPath, kfolds):
+from . import trainvaltest
+
+def crossvalDataGen(whichos, path, modalities, kfolds):
     '''
     Outer function to call on combining train val and test subjects. 
-    Sample_command: python -m pre crossvalDataGen --modalityPath /home/user/path_to_modality --kfolds number of folds to split
+    Sample_command: python -m pre crossvalDataGen --path /home/user/path_to_config --modalities /list/of/modalities --kfolds number/of/folds/to/split --whichos operating_sys
     Args:
-        modalityPath: path to the modality for which you want to generate cross validation folds
+        whichos: linux/windows/remote
+        path: path to the config file that has data paths
+        modalities (list[str]): pass a list of modalities to generate files for crossval subjects
         kfolds: number of crossvalidation folds
+
     '''
     folds = int(kfolds)
+    if isinstance(modalities, str):
+        modalities = modalities.strip('""][').replace("'","").split(',')
+    modalities = sorted(modalities, reverse=False)
+    configs = trainvaltest.return_configs_asdict(whichos, path)
+    basepath = os.path.join(configs['os'][whichos]['after_split_path'],'fold1')
+    modalityPath = os.path.join(basepath, '_'.join(modalities))
     combine_train_test_val(modalityPath, kfolds=folds)
     return
 

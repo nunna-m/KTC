@@ -12,6 +12,7 @@ import cv2
 import sys
 import matplotlib.pyplot as plt
 import tensorflow_addons as tfa
+import yaml
 
 TL_num = 3
 
@@ -24,6 +25,7 @@ def train_ds(
     output_size=(224,224),
     aug_configs=None,
     tumor_region_only=False,
+    cv=False,
 ):
     if aug_configs is None:
         aug_configs = {
@@ -40,12 +42,18 @@ def train_ds(
         random_rotation_img: {},
         random_shear_img: {},
     }
-    traindir = os.path.join(data_root,'_'.join(modalities),'train')
+    if cv:
+        with open(data_root,'r') as file:
+            data = yaml.safe_load(file)
+        traindir = data['train']
+    else:
+        traindir = os.path.join(data_root,'_'.join(modalities),'train')
     dataset = load_raw(
         traindir,
         modalities=modalities,
         output_size=output_size,
-        tumor_region_only = tumor_region_only
+        tumor_region_only = tumor_region_only,
+        cv=cv,
     )
     dataset = augmentation(
         dataset,
@@ -85,17 +93,27 @@ def predict_ds(data_root,
          modalities,
          batch_size,
          output_size=(224,224),
-         tumor_region_only=False):
-    testdir = os.path.join(data_root,'_'.join(modalities),'test')
-    ds = load_raw(testdir,modalities=modalities, output_size=output_size, tumor_region_only=tumor_region_only)
+         tumor_region_only=False,
+         cv=False):
+    if cv:
+        with open(data_root,'r') as file:
+            data = yaml.safe_load(file)
+        testdir = data['test']
+    else:
+        testdir = os.path.join(data_root,'_'.join(modalities),'test')
+    ds = load_raw(testdir,modalities=modalities, output_size=output_size, tumor_region_only=tumor_region_only,cv=cv)
     ds = ds.batch(batch_size)
     return ds
 
-def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,224), tumor_region_only=False, dtype=tf.float32):
+def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,224), tumor_region_only=False, dtype=tf.float32, cv=False):
+    if cv:
+        training_subject_paths = traindir
+        multiclass = True
+    else:
+        training_subject_paths = glob.glob(os.path.join(traindir,*'*'*2))
+        multiclass = False
     
-    training_subject_paths = glob.glob(os.path.join(traindir,*'*'*2))
     ds = tf.data.Dataset.from_tensor_slices(training_subject_paths)
-    
     label_ds = ds.interleave(
             partial(
                 tf_combine_labels,
@@ -105,7 +123,6 @@ def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,2
             cycle_length=count(ds),
             num_parallel_calls=tf.data.experimental.AUTOTUNE,
         )
-    multiclass = False
     if multiclass:
         label_ds = label_ds.map(convert_one_hot)
     feature_ds = ds.interleave(
@@ -132,8 +149,6 @@ def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,2
     ds = tf.data.Dataset.zip((feature_ds, label_ds))
     norm = 3
     ds = ds.map(lambda image, label: tf_reshape_cast_normalize(image, label, num_mod=norm, dtype=dtype), tf.data.experimental.AUTOTUNE)
-    
-    
     return ds
 
 def convert_one_hot(label):

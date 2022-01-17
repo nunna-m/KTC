@@ -24,6 +24,7 @@ class CNN(Model):
         dropout=None,
         trainable=True,
         activation='relu',
+        classifier_activation='softmax',
         num_classes=1,
         **kargs,
     ):
@@ -42,7 +43,7 @@ class CNN(Model):
 
         # GAP, followed by Classifier
         self.gap   = layers.GlobalAveragePooling2D()
-        self.dense = layers.Dense(num_classes, activation='sigmoid')
+        self.dense = layers.Dense(num_classes, activation=classifier_activation)
     
     @tf.function
     def call(self, input_tensor, training=False):

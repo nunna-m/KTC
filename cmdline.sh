@@ -1,1 +1,3 @@
-python -m ktc train --whichos windows --fold 1 --network cnn --modalities dc ec pc --config "configfiles/extra/data_options.yaml" --max_steps 20 --validate
+python3 -m ktc train_stacked --whichos remote --config "configfiles/extra/stacked_data_options.yaml" --max_steps 100
+
+#python -m ktc train_stacked --whichos windows --config "configfiles/extra/stacked_data_options.yaml" --max_steps 5

@@ -33,6 +33,7 @@ def count_samples(modalities, generalpath, split):
     modalities = sorted(modalities, reverse=False)
     ms = '_'.join(modalities)
     aml = os.path.join(generalpath,ms,split,'AML')
+    print(modalities, generalpath, ms, aml)
     nf_aml = 0
     for subject in os.listdir(aml):
         subject_path = os.path.join(aml, subject)

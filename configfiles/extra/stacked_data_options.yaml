@@ -1,21 +1,38 @@
 data_options:
-    cv: True
     split_CTMRI: True
+    modalities: ['am', 'dc', 'ec', 'pc', 'tm']
+    network_info:
+      level_0:
+        cnn
+      level_1:
+        fc
     remote:
         data_path:
             /kw_resources/datasets/kt_new_trainvaltest
         save_path:
             /kw_resources/results/kidney_tumor
+        folds_path:
+            /kw_resources/datasets/kt_new_trainvaltest/fold2/am_dc_ec_pc_tm/allSubjectPaths
+        save_models_here:
+          /kw_resources/results/kidney_tumor/stacked/fold
     linux:
         data_path:
             /home/maanvi/LAB/Datasets/kt_new_trainvaltest
         save_path:
             /home/maanvi/LAB/results/kidney_tumor
+        folds_path:
+            /home/maanvi/LAB/Datasets/kt_new_trainvaltest/fold2/am_dc_ec_pc_tm/allSubjectPaths
+        save_models_here:
+            /home/maanvi/LAB/results/kidney_tumor/stacked/fold
     windows:
         data_path:
-            D:\01_Maanvi\LABB\datasets\kt_new_trainvaltest
+            D:\01_Maanvi\LABB\datasets\kt_new_trainvaltest\fold1
         save_path:
             D:\01_Maanvi\LABB\results\kidney_tumor
+        folds_path:
+            D:\01_Maanvi\LABB\datasets\kt_new_trainvaltest\fold1\am_dc_ec_pc_tm\allSubjectPaths
+        save_models_here:
+          D:\01_Maanvi\LABB\results\kidney_tumor\stacked\fold
     train:
         batch_size: 32
         buffer_size: 1024
@@ -26,6 +43,7 @@ data_options:
             random_verticalflip:
             random_rotation:
             random_brightness:
+        cv: True
                
     eval:
         batch_size: 32
@@ -36,3 +54,4 @@ data_options:
         batch_size: 32
         output_size: [224, 224]
         tumor_region_only: True
+        cv: True

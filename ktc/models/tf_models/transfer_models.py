@@ -210,7 +210,7 @@ class res_net50(Model):
         return x
 
 
-class stackedGB_net(Model):
+class stackedNet(Model):
     def __init__(
         self,
         activation='relu',
