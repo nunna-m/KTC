@@ -222,6 +222,8 @@ class stackedNet(Model):
         **kargs,
     ):
         super().__init__(**kargs)
+        self.dense = layers.Dense(8, activation=activation)
+        self.dense = layers.Dense(20, activation=activation)
         self.dense = layers.Dense(10, activation=activation)
         self.classify_dense = layers.Dense(classifier_neurons, activation=classifier_activation)
         
