@@ -152,13 +152,14 @@ def train_stacked(
     print("$$$$$$$$$$$$$$$$$$$$$$$$$")
     return  
 
-def meta_learner(whichos, config, max_steps):
+def meta_learner(whichos, config, max_steps, level0):
     '''
     Train a model specified in level1 of config taking outputs from networks specified as level0 in the config file.
     Args:
         whichos: operation system linux/windows/remote
         config (list[str]): config file paths (one or more) first one will be the main config and others will overwrite the main one or add to it
         max_steps (int): maximum training epochs
+        level0 (str) : network at level0 (cnn|vgg16)
         '''
     fold_metrics = []
     for fold in range(N_FOLDS):
@@ -176,6 +177,7 @@ def foldwise_meta_learner(
     whichos,
     config,
     max_steps,
+    level_0,
 ):
     
     #current_fold = 0
@@ -184,8 +186,8 @@ def foldwise_meta_learner(
     methods = ['CT', 'MRI']
     #print("Operating System: {}".format(whichos))
     #print("Methods: {}".format(methods))
-    level_0 = config['data_options']['network_info']['level_0']
-    level_1 = config['data_options']['network_info']['level_1']
+    #level_0 = config['data_options']['network_info']['level_0']
+    #level_1 = config['data_options']['network_info']['level_1']
     save_models_here = config['data_options'][whichos]['save_models_here']
     
     #ytest will be same for CT or MRI (because subset of am_dc_ec_pc_tm)
