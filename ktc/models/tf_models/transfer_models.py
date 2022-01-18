@@ -8,6 +8,7 @@ import os
 import tempfile
 import pdb
 import numpy as np
+import xgboost as xgb
 
 # external
 import tensorflow as tf
@@ -254,3 +255,7 @@ def define_stacked_model(model_members):
         metrics=['categorical_accuracy'],
     )
     return model
+
+def gradientBoosting():
+    cl = xgb.XGBClassifier()
+    return cl

@@ -13,6 +13,7 @@ import pandas as pd
 import numpy as np
 import yaml
 from sklearn.metrics import accuracy_score
+from sklearn.preprocessing import OneHotEncoder
 
 # customs
 from ktc.utils import get, store, load, dump
@@ -152,7 +153,7 @@ def train_stacked(
     print("$$$$$$$$$$$$$$$$$$$$$$$$$")
     return  
 
-def meta_learner(whichos, config, max_steps, level0):
+def meta_learner(whichos, config, max_steps, level0, level1):
     '''
     Train a model specified in level1 of config taking outputs from networks specified as level0 in the config file.
     Args:
@@ -160,10 +161,11 @@ def meta_learner(whichos, config, max_steps, level0):
         config (list[str]): config file paths (one or more) first one will be the main config and others will overwrite the main one or add to it
         max_steps (int): maximum training epochs
         level0 (str) : network at level0 (cnn|vgg16)
+        level1 (str) : network at level1 (fc|xgb)
         '''
     fold_metrics = []
     for fold in range(N_FOLDS):
-        acc = foldwise_meta_learner(fold, whichos, config, max_steps, level0)
+        acc = foldwise_meta_learner(fold, whichos, config, max_steps, level0, level1)
         fold_metrics.append(acc)
         print("Fold: {}, Accuracy: {}".format(fold, acc))
     
@@ -178,6 +180,7 @@ def foldwise_meta_learner(
     config,
     max_steps,
     level_0,
+    level_1,
 ):
     
     #current_fold = 0
@@ -213,13 +216,19 @@ def foldwise_meta_learner(
         #print('new CT shape:', pred_data['CT'].shape)
     
     #print(len(pred_data['CT']), len(pred_data['MRI']))
-    model = fit_stacked_model(pred_data=pred_data, methods=methods, ytest=ytest_data, max_steps=max_steps, lr=base_learning_rate)
+    if level_1 == 'fc':
+        model = fit_stacked_model(pred_data=pred_data, methods=methods, ytest=ytest_data, max_steps=max_steps, lr=base_learning_rate)
+    elif level_1 == 'xgb':
+        model = fit_stacked_xgb(pred_data=pred_data, methods=methods, ytest=ytest_data, max_steps=max_steps, lr=base_learning_rate)
     yhat = stacked_prediction(pred_data=pred_data, methods=methods, model=model)
 
     #print("Ytest data: {}".format(ytest_data))
     #print("Yhat data: {}".format(yhat))
     sv_ytest = np.argmax(ytest_data, axis=1)
-    sv_yhat = np.argmax(yhat, axis=1)
+    if level_1=='xgb':
+        sv_yhat = yhat
+    else:
+        sv_yhat = np.argmax(yhat, axis=1)
     acc = accuracy_score(sv_ytest, sv_yhat)
     print('Stacked Test Accuracy: %.3f' % acc)
     return acc
@@ -248,10 +257,17 @@ def fit_stacked_model(pred_data, methods, ytest, max_steps, lr):
     model.fit(stackedX, ytest, epochs=max_steps)
     return model
 
+def fit_stacked_xgb(pred_data, methods, ytest, max_steps, lr):
+    stackedX = stacked_dataset(pred_data, methods)
+    model = transfer_models.gradientBoosting()
+    new = np.argmax(ytest, axis=1)
+    model.fit(stackedX, new)
+    return model
+
 def stacked_prediction(pred_data, methods, model):
     stackedX = stacked_dataset(pred_data, methods)
-    fc_yhat = model.predict(stackedX)
-    return fc_yhat
+    yhat = model.predict(stackedX)
+    return yhat
 
 
 def load_models(save_models_here, level0_network, lr):
