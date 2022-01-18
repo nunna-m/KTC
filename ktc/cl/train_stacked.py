@@ -181,7 +181,7 @@ def foldwise_meta_learner(
 ):
     
     #current_fold = 0
-    base_learning_rate = 0.00001
+    base_learning_rate = 0.01
     config = load.load_config(config)
     methods = ['CT', 'MRI']
     #print("Operating System: {}".format(whichos))
