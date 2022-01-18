@@ -163,7 +163,7 @@ def meta_learner(whichos, config, max_steps, level0):
         '''
     fold_metrics = []
     for fold in range(N_FOLDS):
-        acc = foldwise_meta_learner(fold, whichos, config, max_steps)
+        acc = foldwise_meta_learner(fold, whichos, config, max_steps, level0)
         fold_metrics.append(acc)
         print("Fold: {}, Accuracy: {}".format(fold, acc))
     
