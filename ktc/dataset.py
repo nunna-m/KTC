@@ -96,9 +96,11 @@ def predict_ds(data_root,
          tumor_region_only=False,
          cv=False):
     if cv:
+        #print("entered cv in predict ds")
         with open(data_root,'r') as file:
             data = yaml.safe_load(file)
         testdir = data['test']
+        #print(testdir, len(testdir))
     else:
         testdir = os.path.join(data_root,'_'.join(modalities),'test')
     ds = load_raw(testdir,modalities=modalities, output_size=output_size, tumor_region_only=tumor_region_only,cv=cv)
@@ -113,6 +115,7 @@ def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,2
         training_subject_paths = glob.glob(os.path.join(traindir,*'*'*2))
         multiclass = False
     
+    #print("data len: ",len(training_subject_paths))
     ds = tf.data.Dataset.from_tensor_slices(training_subject_paths)
     label_ds = ds.interleave(
             partial(
@@ -123,6 +126,11 @@ def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,2
             cycle_length=count(ds),
             num_parallel_calls=tf.data.experimental.AUTOTUNE,
         )
+    # counting = 0
+    # for ele in label_ds.as_numpy_iterator():
+    #     #print(ele)
+    #     counting+=1
+    # print("test data label count inside load raw: ",counting)
     if multiclass:
         label_ds = label_ds.map(convert_one_hot)
     feature_ds = ds.interleave(
@@ -193,6 +201,8 @@ def tf_combine_labels(subject_path, modalities,return_type='array'):
 
 
 def get_label(subject, modality):
+    #print("inside get label")
+    #print(subject, modality)
     if isinstance(subject, str): 
         pass
     elif isinstance(subject, tf.Tensor): 

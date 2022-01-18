@@ -1,5 +1,6 @@
 from audioop import avg
 import os
+from pyexpat import model
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 from datetime import datetime
@@ -11,6 +12,7 @@ from tqdm.keras import TqdmCallback
 import pandas as pd
 import numpy as np
 import yaml
+from sklearn.metrics import accuracy_score
 
 # customs
 from ktc.utils import get, store, load, dump
@@ -130,6 +132,10 @@ def train_stacked(
         # y_test = np.concatenate([y_test_numpy[0],y_test_numpy[1]])
         x_test = x_test_numpy[0]
         y_test = y_test_numpy[0]
+
+        #print(x_test_numpy, y_test_numpy)
+        #print(len(x_test_numpy), len(y_test_numpy))
+        print(len(x_test), len(y_test))
         np.save(testdata_filename+'X.npy',x_test)            
         np.save(testdata_filename+'y.npy',y_test)
         numpy_ypred = model.predict(x_test)
@@ -146,6 +152,126 @@ def train_stacked(
     print("$$$$$$$$$$$$$$$$$$$$$$$$$")
     return  
 
+def meta_learner(whichos, config, max_steps):
+    '''
+    Train a model specified in level1 of config taking outputs from networks specified as level0 in the config file.
+    Args:
+        whichos: operation system linux/windows/remote
+        config (list[str]): config file paths (one or more) first one will be the main config and others will overwrite the main one or add to it
+        max_steps (int): maximum training epochs
+        '''
+    fold_metrics = []
+    for fold in range(N_FOLDS):
+        acc = foldwise_meta_learner(fold, whichos, config, max_steps)
+        fold_metrics.append(acc)
+        print("Fold: {}, Accuracy: {}".format(fold, acc))
+    
+    print("Average Accuracy: ", sum(fold_metrics)/len(fold_metrics))
+
+    return
+
+
+def foldwise_meta_learner(
+    current_fold,
+    whichos,
+    config,
+    max_steps,
+):
+    
+    #current_fold = 0
+    base_learning_rate = 0.00001
+    config = load.load_config(config)
+    methods = ['CT', 'MRI']
+    #print("Operating System: {}".format(whichos))
+    #print("Methods: {}".format(methods))
+    level_0 = config['data_options']['network_info']['level_0']
+    level_1 = config['data_options']['network_info']['level_1']
+    save_models_here = config['data_options'][whichos]['save_models_here']
+    
+    #ytest will be same for CT or MRI (because subset of am_dc_ec_pc_tm)
+    #loading from either one is enough
+    test_data_path = os.path.join(save_models_here+str(current_fold),level_0,methods[0],'testdata/y.npy')
+    ytest_data = np.load(test_data_path)
+    pred_data = dict()
+    pred_data_counts = dict()
+    for met in methods:
+        pred_data_path = os.path.join(save_models_here+str(current_fold),level_0,met,'predictions/yhat.npy')
+        pred_data[met] = np.load(pred_data_path)
+        pred_data_counts[met] = pred_data[met].shape[0]
+        #print(met, pred_data[met].shape)
+    
+    #make CT and MRI same shape
+    if pred_data_counts['CT'] <= pred_data_counts['MRI']:
+        pred_data['MRI'] = pred_data['MRI'][0:pred_data_counts['CT'],:]
+        ytest_data = ytest_data[0:pred_data_counts['CT']]
+        #print('new MRI shape:', pred_data['MRI'].shape)
+    elif pred_data_counts['CT'] > pred_data_counts['MRI']:
+        pred_data['CT'] = pred_data['CT'][0:pred_data_counts['MRI'],:]
+        ytest_data = ytest_data[0:pred_data_counts['MRI']]
+        #print('new CT shape:', pred_data['CT'].shape)
+    
+    #print(len(pred_data['CT']), len(pred_data['MRI']))
+    model = fit_stacked_model(pred_data=pred_data, methods=methods, ytest=ytest_data, max_steps=max_steps, lr=base_learning_rate)
+    yhat = stacked_prediction(pred_data=pred_data, methods=methods, model=model)
+
+    #print("Ytest data: {}".format(ytest_data))
+    #print("Yhat data: {}".format(yhat))
+    sv_ytest = np.argmax(ytest_data, axis=1)
+    sv_yhat = np.argmax(yhat, axis=1)
+    acc = accuracy_score(sv_ytest, sv_yhat)
+    print('Stacked Test Accuracy: %.3f' % acc)
+    return acc
+
+def stacked_dataset(pred_data, methods):
+    stackX = None
+
+    for met in methods:
+        yhat = pred_data[met]
+        if stackX is None:
+            stackX = yhat
+        else:
+            stackX = np.dstack((stackX, yhat))
+    stackX = stackX.reshape((stackX.shape[0], stackX.shape[1]*stackX.shape[2]))
+    print("Stacked shape: {}".format(stackX.shape))
+    return stackX
+
+def fit_stacked_model(pred_data, methods, ytest, max_steps, lr):
+    stackedX = stacked_dataset(pred_data, methods)
+    model = transfer_models.stackedNet()
+    model.compile(
+        optimizer=tf.keras.optimizers.Adam(learning_rate=lr),
+        loss=tf.keras.losses.CategoricalCrossentropy(),
+        metrics=['categorical_accuracy'],
+        )
+    model.fit(stackedX, ytest, epochs=max_steps)
+    return model
+
+def stacked_prediction(pred_data, methods, model):
+    stackedX = stacked_dataset(pred_data, methods)
+    fc_yhat = model.predict(stackedX)
+    return fc_yhat
+
+
+def load_models(save_models_here, level0_network, lr):
+    base_learning_rate = lr
+    both_models = []
+    met = ['CT','MRI']
+    f = 0
+    for i in range(len(met)):
+        if level0_network == 'cnn':
+            model = vanillacnn.CNN(classifier_activation='softmax',num_classes=2)
+        elif level0_network == 'vgg16':
+            model = transfer_models.vgg16_net(classifier_activation='softmax', classifier_neurons=2)
+        model.compile(
+        optimizer=tf.keras.optimizers.Adam(learning_rate=base_learning_rate),
+        loss=tf.keras.losses.CategoricalCrossentropy(),
+        metrics=['categorical_accuracy'],
+        )
+        model_path = os.path.join(save_models_here+str(f),level0_network,met[i],'weights/')
+        model.load_weights(model_path)
+        both_models.append(model)
+
+    return both_models
 
 # for i in range(N_FOLDS):
 #         send_path = folds_path+str(i)+'.yaml'

@@ -3,6 +3,7 @@ Transfer Learnt Models defined here
 '''
 
 # built-in
+from ast import Mod
 import os
 import tempfile
 import pdb
@@ -17,6 +18,7 @@ from tensorflow.keras import Model
 from tensorflow.python.keras.backend import dropout, dtype
 from tensorflow.python.keras.layers.advanced_activations import Softmax
 from tensorflow.keras import backend as K
+from tensorflow.keras.utils import plot_model
 # customs
 from . import components
 
@@ -215,30 +217,38 @@ class stackedNet(Model):
     def __init__(
         self,
         activation='relu',
-        classifier_neurons=1,
+        classifier_activation='softmax',
+        classifier_neurons=2,
         **kargs,
     ):
         super().__init__(**kargs)
-        self.base_model = tf.keras.applications.VGG16(input_shape=(224, 224, 3), include_top=False, weights='imagenet')
-        #self.base_model = add_regularization(self.base_model)
-        for self.layer in self.base_model.layers:
-            self.layer.trainable = False
-        
-        self.last_layer = self.base_model.get_layer('block5_pool')
-        self.top_model = self.last_layer.output
-        self.gap = layers.GlobalAveragePooling2D()
-        self.dense1 = layers.Dense(512, activation=activation)
-        self.dropout = layers.Dropout(0.2)
-        self.dense2 = layers.Dense(256, activation=activation, name='penultimate')
-        self.dense3 = layers.Dense(classifier_neurons, activation='sigmoid')
+        self.dense = layers.Dense(10, activation=activation)
+        self.classify_dense = layers.Dense(classifier_neurons, activation=classifier_activation)
         
     
     @tf.function
     def call(self, input_tensor, training=False):
-        x = self.base_model(input_tensor)
-        # x = self.gap(x)
-        # x = self.dense1(x)
-        # x = self.dense2(x)
-        # x = self.dropout(x)
-        # x = self.dense3(x)
+        x = self.dense(input_tensor)
+        x = self.classify_dense(x)
         return x
+    
+def define_stacked_model(model_members):
+    for i in range(len(model_members)):
+        model = model_members[i]
+        for layer in model.layers:
+            layer.trainable = False
+            layer._name = 'ensemble_'+str(i+1)+'_'+layer.name
+    
+    ensemble_visible = [model.input for model in model_members]
+    ensemble_outputs = [model.output for model in model_members]
+    merge = layers.Concatenate(ensemble_outputs)
+    hidden = layers.Dense(10, activation='relu')(merge)
+    output = layers.Dense(2, activation='softmax')(hidden)
+    model = Model(inputs=ensemble_visible, outputs=output)
+    plot_model(model, show_shapes=True, to_file='model_graph.png')
+    model.compile(
+        loss='categorical_crossentropy',
+        optimizer='adam',
+        metrics=['categorical_accuracy'],
+    )
+    return model
