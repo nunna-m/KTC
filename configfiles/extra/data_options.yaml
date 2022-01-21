@@ -1,5 +1,4 @@
 data_options:
-    cv: True
     split_CTMRI: True
     remote:
         data_path:

@@ -78,11 +78,14 @@ def train(
     save_path = config['data_options'][whichos]['save_path']
     data_path = config['data_options'][whichos]['data_path']
     split_CTMRI = config['data_options']['split_CTMRI']
+   # cv = config['data_options']['cv']
     fold = str(fold)
     network = str(network[0])
-
+    
     data_path = os.path.join(data_path, 'fold'+fold)
     save_path = os.path.join(save_path, 'fold'+fold, network)
+    
+
     dump.dump_options(
         os.path.join(save_path, 'options_fold'+fold+'_'+network+'.yaml'),
         avoid_overwrite=True,
@@ -159,12 +162,12 @@ def train(
                 metrics=METRICS)
     batch_size = config['data_options']['train']['batch_size']
     n_trainsteps = folders.count_samples(modalities,data_path,'train')['total']//batch_size
-    n_valsteps = folders.count_samples(modalities,data_path,'val')['total']//batch_size
-
-    #n_trainsteps = 1
-    print("batchsize, trainsteps, valsteps")
-    print(batch_size, n_trainsteps, n_valsteps)
-    results = model.fit(
+    if validate:
+        n_valsteps = folders.count_samples(modalities,data_path,'val')['total']//batch_size
+        #n_trainsteps = 1
+        print("batchsize, trainsteps, valsteps")
+        print(batch_size, n_trainsteps, n_valsteps)
+        results = model.fit(
         ds,
         batch_size = batch_size,
         validation_data=val_ds,
@@ -173,12 +176,15 @@ def train(
         callbacks = [reduce_lr, TqdmCallback(verbose=2)],
         verbose=0,
     )
-    
-    # dump.dump_train_results(
-    #     os.path.join(save_path, 'results.pkl'),
-    #     results,
-    #     format_='pickle',
-    # )
+    else:
+        results = model.fit(
+        ds,
+        batch_size = batch_size,
+        steps_per_epoch=n_trainsteps,
+        epochs=max_steps,
+        callbacks = [reduce_lr, TqdmCallback(verbose=2)],
+        verbose=0,
+    )
 
     #predict
     test_ds = dataset.predict_ds(data_path, modalities, **config['data_options']['test'])
