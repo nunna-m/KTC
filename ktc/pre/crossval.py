@@ -8,7 +8,7 @@ import numpy as np
 
 from . import trainvaltest
 
-def crossvalDataGen(whichos, path, modalities, kfolds):
+def crossvalDataGen(whichos, path, modalities, kfolds, holdout):
     '''
     Outer function to call on combining train val and test subjects. 
     Sample_command: python -m pre crossvalDataGen --path /home/user/path_to_config --modalities /list/of/modalities --kfolds number/of/folds/to/split --whichos operating_sys
@@ -17,9 +17,11 @@ def crossvalDataGen(whichos, path, modalities, kfolds):
         path: path to the config file that has data paths
         modalities (list[str]): pass a list of modalities to generate files for crossval subjects
         kfolds: number of crossvalidation folds
+        holdout (bool): take out test data for holdout yes if included in CMDline else no
 
     '''
     folds = int(kfolds)
+    
     if isinstance(modalities, str):
         modalities = modalities.strip('""][').replace("'","").split(',')
     modalities = sorted(modalities, reverse=False)
@@ -40,9 +42,10 @@ def combine_train_test_val(path, kfolds=1):
 
     for subject in all_classes_path:
         subjectCopy = subject[:]
-        clas = subjectCopy.rsplit(os.path.sep, 2)[-2]
+        clas = subjectCopy.rsplit(os.path.sep, 2)[-2] #AML or CCRCC
         paths[clas].append(subject)
 
+    #working here !!!!!
     with open(os.path.join(path,'allSubjectPaths.yaml'),'w') as file:
         yaml.dump(paths,file)
     k5 = KFold(n_splits=kfolds, shuffle=False)
