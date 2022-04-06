@@ -84,9 +84,9 @@ def combine_train_test_val(path, kfolds=1):
             train_full[fold_num].extend(np.take(paths[clas],train_index))
             test_full[fold_num].extend(np.take(paths[clas],test_index))
             fold_num+=1
-    storeCVPath = os.path.join(path,'{}Leave2outCV'.format(kfolds))
+    storeCVPath = os.path.join(path,'Leave2outCV')
     os.makedirs(storeCVPath, exist_ok=True)
-    for i in range(kfolds):
+    for i in range(k.get_n_splits()):
         random.shuffle(train_full[i])
         random.shuffle(test_full[i])
         new_train_full = [str(pat) for pat in train_full[i]]
