@@ -77,7 +77,7 @@ def combine_train_test_val(path, kfolds=1, loocv=False):
     
     #leave-one-out CV
     if loocv:
-        k = KFold(n_splits=len(paths['AML']), shuffle=False)
+        k = KFold(n_splits=len(paths['AML']), shuffle=False) #taking length of class as it is smaller, doing loocv on AML and CCRCC separately and then joining the lists
         train_full, test_full = dict(), dict()
         for i in range(len(paths['AML'])):
             train_full[i] = list()
