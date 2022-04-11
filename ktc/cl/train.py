@@ -67,7 +67,7 @@ def train(
     data_path = os.path.join(config['data_options'][whichos]['data_path'],'_'.join(modalities))
     split_CTMRI = config['data_options']['split_CTMRI']
     cv = int(config['data_options']['cv'])
-    
+    metrics_file_name = config['data_options']['metrics_file_name']
 
     dump.dump_options(
         os.path.join(save_path, 'options_'+network+'_{}CV.yaml'.format(cv)),
@@ -195,7 +195,7 @@ def train(
 
         print(eval_metrics)
 
-        metrics_path = os.path.join(oldSavePath,'metrics.csv')
+        metrics_path = os.path.join(oldSavePath,'metrics_'+metrics_file_name+'.csv')
         if not os.path.exists(metrics_path):
             df = pd.DataFrame(columns=colnames)
             df = df.append(eval_metrics,ignore_index=True)
