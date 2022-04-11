@@ -48,8 +48,7 @@ def count_fromFiles(path, split):
         mods = parts[1].split('_')
         clas = parts[3]
         #print(clas)
-        for mod in mods:
-            classes[clas] += len(os.listdir(os.path.join(subject,mod)))
+        classes[clas] += len(os.listdir(os.path.join(subject,mods[0])))
     
     return classes['AML'], classes['CCRCC']
 
