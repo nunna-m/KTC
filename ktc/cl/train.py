@@ -18,7 +18,7 @@ from datetime import datetime
 import tensorflow as tf
 from tensorflow import keras
 from matplotlib import pyplot as plt
-from sklearn.metrics import roc_curve
+from sklearn.metrics import auc, roc_curve
 from tqdm.keras import TqdmCallback
 import pandas as pd
 import csv
@@ -33,106 +33,52 @@ from ktc.models.tf_models import transfer_models, vanillacnn
 
 logsdir = "logs/fit/transfer_learning/" + datetime.now().strftime("%m%d-%H%M")
 tensorboard_callback = keras.callbacks.TensorBoard(log_dir=logsdir)
-
+folds_string = 'allSubjectPaths{}.yaml'
 def train(
     whichos,
-    config,
-    fold,
-    network,
     modalities,
+    method,
+    network,
+    config,
     max_steps,
-    early_stop_steps=None,
-    save_freq=500,
-    validate=False,
-    val_data_path=None,
-    visualize=False,
-    profile=False,
 ):
     '''
     Train a model with specified configs.
-    This function will first dump the input arguments,
-    then train a model, finally dump reults.
+    Stores the cmdline args and other configs in one file for future ref, trains the model, stores results in csv and plots too.
 
     Args:
-        whichos: operating system linux/windows/remote(docker)
-        config (list[str]): configuration file path
-            This option accepts arbitrary number of configs.
-            If a list is specified, the first one is considered
-            as a "main" config, and the other ones will overwrite the content
-        fold (int): the fold representing random creation of train/val/test
-        network (list[str]): which neural network to use
+        whichos: operation system linux/windows/remote
         modalities (list[str]): the modalites being used
         max_steps (int): max training steps
-        early_stop_steps: steps to train without improvements
-            None(default) disables this feature
-        save_freq: interval of checkpoints
-            default: 500 steps
-        validate: also validate the model on the validation dataset
-        val_data_path (list[str]): path to the validation dataset
-        visualize (bool): should visualize results
-        profile (bool): enable profilling
+        method: CT or MRI or both
+        network: which network to use
+        config (list[str]): config file paths (one or more) first one will be the main config and others will overwrite the main one or add to it
+        max_steps (int): maximum training epochs
     '''
     config = load.load_config(config)
-    print("modalities and os: ",modalities, whichos)
     modalities = sorted(modalities, reverse=False)
-    save_path = config['data_options'][whichos]['save_path']
-    data_path = config['data_options'][whichos]['data_path']
+    print("Modalities: %s"%modalities)
+    print("Operating System: {}".format(whichos))
+    print("Method: %s"%method)
+    #network = str(network[0])
+    oldSavePath = os.path.join(config['data_options'][whichos]['save_path'],network)
+    save_path = os.path.join(config['data_options'][whichos]['save_path'],network,'_'.join(modalities))
+    oldDataPath = config['data_options'][whichos]['data_path']
+    data_path = os.path.join(config['data_options'][whichos]['data_path'],'_'.join(modalities))
     split_CTMRI = config['data_options']['split_CTMRI']
-   # cv = config['data_options']['cv']
-    fold = str(fold)
-    network = str(network[0])
-    
-    data_path = os.path.join(data_path, 'fold'+fold)
-    save_path = os.path.join(save_path, 'fold'+fold, network)
+    cv = int(config['data_options']['cv'])
     
 
     dump.dump_options(
-        os.path.join(save_path, 'options_fold'+fold+'_'+network+'.yaml'),
+        os.path.join(save_path, 'options_'+network+'_{}CV.yaml'.format(cv)),
         avoid_overwrite=True,
         config=config,
         save_path=save_path,
         data_path=data_path,
     )
-    print(save_path,data_path)
-    
-    ds = dataset.train_ds(data_path, modalities, **config['data_options']['train'])
-    if validate:
-        #assert val_data_path is not None
-        val_ds = dataset.eval_ds(data_path, modalities, **config['data_options']['eval'])
-    else: val_ds = None
+    print("Data Path: {}".format(data_path))
+    print("Save Path: {}".format(save_path))
 
-    if visualize:
-        visualization = {
-            'train': dataset.eval_ds(data_path, modalities, **config['data_options']['eval'], include_meta=True),
-            'validation': dataset.eval_ds(val_data_path, modalities,**config['data_options']['eval'], include_meta=True),
-        }
-    else: visualization = {}
-    #model = engine.TFKerasModel(config)
-    # model = vanillacnn.CNN(activation='relu',num_classes=2)
-    # model.compile(
-    #     loss=tf.keras.losses.CategoricalCrossentropy(),
-    #     metrics=tf.keras.metrics.CategoricalAccuracy(),
-    #     optimizer=tf.keras.optimizers.Adam(),
-    # )
-    # results = model.fit(
-    #     ds,
-    #     validation_data=val_ds,
-    #     steps_per_epoch=1,
-    #     epochs=100,
-
-    # )
-    # print(results)
-    tf.keras.backend.clear_session()
-    num_neurons = 1
-    #network = 'cnn'
-    if network == 'alexnet':
-        model = transfer_models.alex_net(classifier_neurons=num_neurons)
-    if network == 'vgg16':
-        model = transfer_models.vgg16_net(classifier_neurons=num_neurons)
-    if network == 'resnet':
-        model = transfer_models.res_net50(classifier_neurons=num_neurons)
-    if network == 'cnn':
-        model = vanillacnn.CNN(activation='relu',num_classes=1)
     base_learning_rate = 0.00001
     decay = base_learning_rate / max_steps
     reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.2,
@@ -156,96 +102,138 @@ def train(
       keras.metrics.AUC(name='auc'),
       keras.metrics.AUC(name='prc', curve='PR'), 
     ]
-
-    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=base_learning_rate),
-                loss=tf.keras.losses.BinaryCrossentropy(),
-                metrics=METRICS)
     batch_size = config['data_options']['train']['batch_size']
-    n_trainsteps = folders.count_samples(modalities,data_path,'train')['total']//batch_size
-    if validate:
-        n_valsteps = folders.count_samples(modalities,data_path,'val')['total']//batch_size
-        #n_trainsteps = 1
-        print("batchsize, trainsteps, valsteps")
-        print(batch_size, n_trainsteps, n_valsteps)
+
+    fold_acc = []
+    here = cv
+    #here = 1
+    for i in range(here):
+        send_path = os.path.join(data_path,'{}CV'.format(cv),folds_string.format(i))
+        trainDS = dataset.train_ds(send_path, modalities, **config['data_options']['train'])
+        testDS = dataset.predict_ds(send_path, modalities, **config['data_options']['test'])
+
+        cvFold = str(i)
+        save_models_here = os.path.join(save_path,'{}CV'.format(cv))
+        weights_filename = os.path.join(save_models_here,'Fold'+cvFold,'weights/')
+        preds_filename = os.path.join(save_models_here,'Fold'+cvFold,'predictions/')
+        testdata_filename = os.path.join(save_models_here, 'Fold'+cvFold,'testdata/')
+        os.makedirs(weights_filename, exist_ok=True)
+        os.makedirs(preds_filename, exist_ok=True)
+        os.makedirs(testdata_filename, exist_ok=True)
+        tf.keras.backend.clear_session()
+
+        num_neurons = 2
+        n_trainsteps = folders.count_total(send_path,'train')//batch_size
+        if network == 'cnn':
+            model = vanillacnn.CNN(classifier_activation='softmax',num_classes=num_neurons)
+        model.compile(
+            optimizer=tf.keras.optimizers.Adam(learning_rate=base_learning_rate),
+            loss=tf.keras.losses.CategoricalCrossentropy(),
+            metrics=METRICS,
+        )
         results = model.fit(
-        ds,
-        batch_size = batch_size,
-        validation_data=val_ds,
-        steps_per_epoch=n_trainsteps,
-        epochs=max_steps,
-        callbacks = [reduce_lr, TqdmCallback(verbose=2)],
-        verbose=0,
-    )
-    else:
-        results = model.fit(
-        ds,
-        batch_size = batch_size,
-        steps_per_epoch=n_trainsteps,
-        epochs=max_steps,
-        callbacks = [reduce_lr, TqdmCallback(verbose=2)],
-        verbose=0,
-    )
-
-    #predict
-    test_ds = dataset.predict_ds(data_path, modalities, **config['data_options']['test'])
-
-    #print(list(test_ds.as_numpy_iterator()))
-
-    loss, tp, fp, tn, fn, acc, precision, recall, AUC, prc = model.evaluate(test_ds)
-    tp = int(tp)
-    fp = int(fp)
-    tn = int(tn)
-    fn = int(fn)
-    print("test loss, test acc: ",model.evaluate(test_ds))
-    print("{} ***********************************RUN DONE ***********************************".format(modalities))
-
-    nf_aml = folders.count_samples(modalities,data_path,'test')['AML']
-    nf_cc = folders.count_samples(modalities,data_path,'test')['CCRCC']
-    if os.path.isdir(save_path) and os.path.exists(save_path):
-        sendpath = os.path.join(save_path, '_'.join(modalities))
-        os.makedirs(sendpath, exist_ok=True)
-    colnames = ['Modalities','#AML(no)','#CCRCC(yes)','AUC','TP','FP','TN','FN','recall','specificity','f2','accuracy']
-    y_numpy = []
-    for iter in test_ds.as_numpy_iterator():
-        y_numpy.append(iter[1])
-    y_numpy = y_numpy[0]
-    y_pred = model.predict(test_ds)
-    y_pred_classes = y_pred.argmax(axis=-1)
-    y_pred = np.squeeze(y_pred)
-    print(y_pred_classes)
+            trainDS,
+            batch_size = batch_size,
+            steps_per_epoch=n_trainsteps,
+            epochs=max_steps,
+            callbacks = [TqdmCallback(verbose=2)],
+            verbose=0,
+        )
+        model.save_weights(weights_filename)
     
-    eval_metrics = {k:0 for k in colnames}
-    roundoff = 3
-    eval_metrics['Modalities'] = ' '.join(modalities)
-    eval_metrics['#AML(no)'] = nf_aml
-    eval_metrics['#CCRCC(yes)'] = nf_cc
-    eval_metrics['TP'] = tp
-    eval_metrics['FP'] = fp
-    eval_metrics['TN'] = tn
-    eval_metrics['FN'] = fn
-    eval_metrics['accuracy'] = np.round_(acc,roundoff)
-    eval_metrics['AUC'] = AUC
-    plot_loss_acc(results, sendpath, network=network)
-    plot_roc(y_numpy, y_pred, sendpath)
-    f2 = plot_confmat(tp, fp, tn, fn, sendpath, roundoff)
-    eval_metrics['f2'] = np.round_(f2,roundoff)
-    eval_metrics['recall'] = np.round_((tp/(tp+fn)),roundoff)
-    eval_metrics['specificity'] = np.round_((tn/(tn+fp)),roundoff)
+        x_test_numpy = []
+        y_test_numpy = []
+        for iter in testDS.as_numpy_iterator():
+            x_test_numpy.append(iter[0])
+            y_test_numpy.append(iter[1])
 
-    print(eval_metrics)
+        x_test = x_test_numpy
+        y_test = np.array(y_test_numpy)
+        print(len(x_test), len(y_test))
+        np.save(testdata_filename+'X.npy',x_test)            
+        np.save(testdata_filename+'y.npy',y_test)
+        numpy_ypred = np.array(model.predict(testDS))
+        np.save(preds_filename+'yhat.npy',numpy_ypred)
+        print('Saved into: %s'%weights_filename)
+        #loss, tp, fp, tn, fn, acc, precision, recall, AUC, prc = model.evaluate(testDS)
+        tp, fp, tn, fn = perf_measure(y_test.argmax(axis=-1),numpy_ypred.argmax(axis=-1))
+        acc = (tp+tn) / (tp+fp+tn+fn)
+        print("test acc: ",acc)           
+        fold_acc.append(acc)
+        nf_aml,nf_cc = folders.count_fromFiles(send_path, 'test')
+        if os.path.isdir(save_path) and os.path.exists(save_path):
+            sendpath = os.path.join(save_models_here,'Fold'+cvFold)
+            os.makedirs(sendpath, exist_ok=True)
+        colnames = ['Network','Modalities','Fold#','#AML(no)','#CCRCC(yes)','AUC','TP','FP','TN','FN','recall','specificity','f2','accuracy']
+        y_numpy = []
+        for iter in testDS.as_numpy_iterator():
+            y_numpy.append(iter[1])
+        y_numpy = y_numpy[0]
+        y_pred = model.predict(testDS)
+        y_pred_classes = y_pred.argmax(axis=-1)
+        y_pred = np.squeeze(y_pred)
+        #print(y_pred_classes)
+        
+        eval_metrics = {k:0 for k in colnames}
+        roundoff = 3
+        eval_metrics['Network'] = network
+        eval_metrics['Modalities'] = ' '.join(modalities)
+        eval_metrics['Fold#'] = i
+        eval_metrics['#AML(no)'] = nf_aml
+        eval_metrics['#CCRCC(yes)'] = nf_cc
+        eval_metrics['TP'] = tp
+        eval_metrics['FP'] = fp
+        eval_metrics['TN'] = tn
+        eval_metrics['FN'] = fn
+        eval_metrics['accuracy'] = np.round_(acc,roundoff)
+        eval_metrics['AUC'] = plot_roc(y_test.argmax(axis=-1),numpy_ypred.argmax(axis=-1), sendpath)
+        #plot_loss_acc(results, sendpath, network=network)
+        #plot_roc(y_numpy, y_pred, sendpath)
+        f2 = plot_confmat(tp, fp, tn, fn, sendpath, roundoff)
+        eval_metrics['f2'] = np.round_(f2,roundoff)
+        eval_metrics['recall'] = np.round_((tp/(tp+fn)),roundoff)
+        eval_metrics['specificity'] = np.round_((tn/(tn+fp)),roundoff)
 
-    metrics_path = os.path.join(save_path,'metrics.csv')
-    if not os.path.exists(metrics_path):
-        df = pd.DataFrame(columns=colnames)
-        df = df.append(eval_metrics,ignore_index=True)
-        df.to_csv(metrics_path)
-    else:
-        extra = pd.DataFrame([eval_metrics])
-        extra.to_csv(metrics_path, mode='a', header=False)
+        print(eval_metrics)
+
+        metrics_path = os.path.join(oldSavePath,'metrics.csv')
+        if not os.path.exists(metrics_path):
+            df = pd.DataFrame(columns=colnames)
+            df = df.append(eval_metrics,ignore_index=True)
+            df.to_csv(metrics_path)
+        else:
+            extra = pd.DataFrame([eval_metrics])
+            extra.to_csv(metrics_path, mode='a', header=False)
+        print("{} ***********************************RUN DONE FOLD***********************************".format(i))
+        del model
+        del results
     
-    return results
+    avg_acc = np.array(fold_acc).mean()
+    print("$$$$$$$$$$$$$$$$$$$$$$$$$")
+    print("AVG ACC: {}".format(avg_acc))
+    print("$$$$$$$$$$$$$$$$$$$$$$$$$")
     
+    
+    return
+    
+def perf_measure(y_actual, y_hat):
+    TP = 0
+    FP = 0
+    TN = 0
+    FN = 0
+    #print("y_actual: ",y_actual, len(y_actual))
+    #print("y_hat: ",y_hat, len(y_hat))
+    for i in range(len(y_hat)): 
+        if y_actual[i]==y_hat[i]==1:
+           TP += 1
+        if y_hat[i]==1 and y_actual[i]!=y_hat[i]:
+           FP += 1
+        if y_actual[i]==y_hat[i]==0:
+           TN += 1
+        if y_hat[i]==0 and y_actual[i]!=y_hat[i]:
+           FN += 1
 
+    return(TP, FP, TN, FN)
 def plot_roc(y_true, y_pred, path):
     fpr, tpr, _ = roc_curve(y_true, y_pred)
     fig = plt.figure()
@@ -257,6 +245,7 @@ def plot_roc(y_true, y_pred, path):
     plt.title('Receiver operating characteristic')
     plt.savefig(os.path.join(path,'roc.png'))
     plt.close(fig)
+    return auc(fpr, tpr)
     
 def fbeta(tp, fp, tn, fn, beta=2.0):
     squared = pow(beta, 2)

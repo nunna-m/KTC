@@ -1,34 +1,5 @@
 import os
-
-def old_count_samples(modalities, generalpath, split):
-    modalities = sorted(modalities, reverse=False)
-    ms = '_'.join(modalities)
-    aml = os.path.join(generalpath,ms,split,'AML')
-    nf_aml = 0
-    for base, dirs, files in os.walk(aml):
-        get_mode = base.rsplit('/',1)[1]
-        if get_mode in modalities:
-            for file in os.walk(base):
-                print("filenames: ",file[0],file[2])
-                nf_aml+=len(file[2])
-
-    nf_cc = 0
-    cc = os.path.join(generalpath,ms,split,'CCRCC')
-    for base, dirs, files in os.walk(cc):
-        get_mode = base.rsplit('/',1)[1]
-        if get_mode in modalities:
-            for file in os.walk(base):
-                nf_cc+=len(file[2])
-
-    return {
-        'AML':nf_aml,
-        'CCRCC':nf_cc,
-        'total':nf_aml+nf_cc,
-    }
-
-#print(count_samples(['ec','tm'],'/home/maanvi/LAB/Datasets/kt_new_trainvaltest', 'val'))
-
-
+import yaml
 def count_samples(modalities, generalpath, split):
     modalities = sorted(modalities, reverse=False)
     ms = '_'.join(modalities)
@@ -40,7 +11,7 @@ def count_samples(modalities, generalpath, split):
         count = 10
         for mode in os.listdir(subject_path):
             if mode in modalities:
-                mode_path = os.path.join(aml, subject, mode)
+                mode_path = os.path.join(subject_path, mode)
                 listout = os.listdir(mode_path)
                 if len(listout) < count:
                     count = len(listout)
@@ -66,3 +37,19 @@ def count_samples(modalities, generalpath, split):
     }
 
 # print(count_samples(['dc'],'/home/maanvi/LAB/Datasets/kt_new_trainvaltest/fold1', 'train'))
+
+def count_fromFiles(path, split):
+    with open(path, 'r') as file:
+        data = yaml.safe_load(file)[split]
+    
+    classes = {'AML':0,'CCRCC':0}
+    for subject in data:
+        clas = subject.rsplit(os.path.sep, 2)[1]
+        #print(clas)
+        classes[clas] += 1
+    
+    return classes['AML'], classes['CCRCC']
+
+def count_total(path, split):
+    aml, cc = count_fromFiles(path, split)
+    return aml+cc

@@ -28,7 +28,7 @@ def crossvalDataGen(whichos, path, modalities, kfolds, loocv=False):
     modalities = sorted(modalities, reverse=False)
     print("Modalities: ",modalities)
     configs = trainvaltest.return_configs_asdict(whichos, path)
-    basepath = os.path.join(configs['os'][whichos]['after_split_path'],'fold1')
+    basepath = os.path.join(configs['os'][whichos]['after_split_path'])
     modalityPath = os.path.join(basepath, '_'.join(modalities))
     combine_train_test_val(modalityPath, kfolds=folds, loocv=loocv)
     return
