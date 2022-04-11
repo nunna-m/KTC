@@ -68,7 +68,6 @@ def train(
     split_CTMRI = config['data_options']['split_CTMRI']
     cv = int(config['data_options']['cv'])
     metrics_file_name = config['data_options']['metrics_file_name']
-
     dump.dump_options(
         os.path.join(save_path, 'options_'+network+'_{}CV.yaml'.format(cv)),
         avoid_overwrite=True,

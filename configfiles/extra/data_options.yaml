@@ -1,7 +1,7 @@
 data_options:
     split_CTMRI: False
     cv: 5
-    metrics_file_name: '7Augmentations_30epochs'
+    metrics_file_name: ''
     remote:
         data_path:
             /kw_resources/datasets/kt_new_trainvaltest
@@ -27,9 +27,6 @@ data_options:
             rotate90:
             rotate180:
             rotate270:
-            up_rotate90:
-            up_rotate180:
-            up_rotate270:
 
     eval:
         batch_size: 32
