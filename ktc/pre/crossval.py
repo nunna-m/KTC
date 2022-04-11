@@ -26,7 +26,7 @@ def crossvalDataGen(whichos, path, modalities, kfolds, loocv=False):
     if isinstance(modalities, str):
         modalities = modalities.strip('""][').replace("'","").split(',')
     modalities = sorted(modalities, reverse=False)
-    print("Modalities: ",modalities)
+    print(' '.join(modalities))
     configs = trainvaltest.return_configs_asdict(whichos, path)
     basepath = os.path.join(configs['os'][whichos]['after_split_path'])
     modalityPath = os.path.join(basepath, '_'.join(modalities))

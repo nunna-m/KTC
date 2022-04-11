@@ -147,16 +147,17 @@ def train(
             x_test_numpy.append(iter[0])
             y_test_numpy.append(iter[1])
 
-        x_test = x_test_numpy
+        x_test = np.array(x_test_numpy)
         y_test = np.array(y_test_numpy)
-        print(len(x_test), len(y_test))
         np.save(testdata_filename+'X.npy',x_test)            
         np.save(testdata_filename+'y.npy',y_test)
-        numpy_ypred = np.array(model.predict(testDS))
-        np.save(preds_filename+'yhat.npy',numpy_ypred)
+
+        y_pred = np.array(model.predict(testDS))
+        np.save(preds_filename+'yhat.npy',y_pred)
         print('Saved into: %s'%weights_filename)
-        #loss, tp, fp, tn, fn, acc, precision, recall, AUC, prc = model.evaluate(testDS)
-        tp, fp, tn, fn = perf_measure(y_test.argmax(axis=-1),numpy_ypred.argmax(axis=-1))
+        
+        
+        tp, fp, tn, fn = perf_measure(y_test.argmax(axis=-1),y_pred.argmax(axis=-1))
         acc = (tp+tn) / (tp+fp+tn+fn)
         print("test acc: ",acc)           
         fold_acc.append(acc)
@@ -165,14 +166,13 @@ def train(
             sendpath = os.path.join(save_models_here,'Fold'+cvFold)
             os.makedirs(sendpath, exist_ok=True)
         colnames = ['Network','Modalities','Fold#','#AML(no)','#CCRCC(yes)','AUC','TP','FP','TN','FN','recall','specificity','f2','accuracy']
-        y_numpy = []
-        for iter in testDS.as_numpy_iterator():
-            y_numpy.append(iter[1])
-        y_numpy = y_numpy[0]
-        y_pred = model.predict(testDS)
-        y_pred_classes = y_pred.argmax(axis=-1)
-        y_pred = np.squeeze(y_pred)
-        #print(y_pred_classes)
+        # y_numpy = []
+        # for iter in testDS.as_numpy_iterator():
+        #     y_numpy.append(iter[1])
+        # y_numpy = y_numpy[0]
+        # y_pred = model.predict(testDS)
+        # y_pred_classes = y_pred.argmax(axis=-1)
+        # y_pred = np.squeeze(y_pred)
         
         eval_metrics = {k:0 for k in colnames}
         roundoff = 3
@@ -186,9 +186,8 @@ def train(
         eval_metrics['TN'] = tn
         eval_metrics['FN'] = fn
         eval_metrics['accuracy'] = np.round_(acc,roundoff)
-        eval_metrics['AUC'] = plot_roc(y_test.argmax(axis=-1),numpy_ypred.argmax(axis=-1), sendpath)
+        eval_metrics['AUC'] = plot_roc(y_test.argmax(axis=-1),y_pred.argmax(axis=-1), sendpath)
         #plot_loss_acc(results, sendpath, network=network)
-        #plot_roc(y_numpy, y_pred, sendpath)
         f2 = plot_confmat(tp, fp, tn, fn, sendpath, roundoff)
         eval_metrics['f2'] = np.round_(f2,roundoff)
         eval_metrics['recall'] = np.round_((tp/(tp+fn)),roundoff)
@@ -234,6 +233,7 @@ def perf_measure(y_actual, y_hat):
            FN += 1
 
     return(TP, FP, TN, FN)
+
 def plot_roc(y_true, y_pred, path):
     fpr, tpr, _ = roc_curve(y_true, y_pred)
     fig = plt.figure()
@@ -246,7 +246,27 @@ def plot_roc(y_true, y_pred, path):
     plt.savefig(os.path.join(path,'roc.png'))
     plt.close(fig)
     return auc(fpr, tpr)
-    
+
+def Find_Optimal_Cutoff(target, predicted):
+    """ Find the optimal probability cutoff point for a classification model related to event rate
+    Parameters
+    ----------
+    target : Matrix with dependent or target data, where rows are observations
+
+    predicted : Matrix with predicted data, where rows are observations
+
+    Returns
+    -------     
+    list type, with optimal cutoff value
+        
+    """
+    fpr, tpr, threshold = roc_curve(target, predicted)
+    i = np.arange(len(tpr)) 
+    roc = pd.DataFrame({'tf' : pd.Series(tpr-(1-fpr), index=i), 'threshold' : pd.Series(threshold, index=i)})
+    roc_t = roc.iloc[(roc.tf-0).abs().argsort()[:1]]
+
+    return list(roc_t['threshold']) 
+
 def fbeta(tp, fp, tn, fn, beta=2.0):
     squared = pow(beta, 2)
     numerator = (1 + squared)*tp

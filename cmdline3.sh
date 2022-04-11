@@ -1,7 +1,9 @@
-python3 -m ktc train --whichos remote --fold 1 --network resnet --modalities dc --config "configfiles/extra/data_options.yaml" --max_steps 50 --validate
-python3 -m ktc train --whichos remote --fold 1 --network resnet --modalities ec --config "configfiles/extra/data_options.yaml" --max_steps 50 --validate
-python3 -m ktc train --whichos remote --fold 1 --network resnet --modalities pc --config "configfiles/extra/data_options.yaml" --max_steps 50 --validate
-python3 -m ktc train --whichos remote --fold 1 --network resnet --modalities dc ec pc --config "configfiles/extra/data_options.yaml" --max_steps 50 --validate
-python3 -m ktc train --whichos remote --fold 1 --network resnet --modalities am --config "configfiles/extra/data_options.yaml" --max_steps 50 --validate
-python3 -m ktc train --whichos remote --fold 1 --network resnet --modalities tm --config "configfiles/extra/data_options.yaml" --max_steps 50 --validate
-python3 -m ktc train --whichos remote --fold 1 --network resnet --modalities am tm --config "configfiles/extra/data_options.yaml" --max_steps 50 --validate
+python3 -m ktc train --whichos remote --modalities dc ec tm --method both --network cnn --config "configfiles/extra/data_options.yaml" --max_steps 50
+python3 -m ktc train --whichos remote --modalities ec pc tm --method both --network cnn --config "configfiles/extra/data_options.yaml" --max_steps 50
+python3 -m ktc train --whichos remote --modalities dc pc tm --method both --network cnn --config "configfiles/extra/data_options.yaml" --max_steps 50
+python3 -m ktc train --whichos remote --modalities am dc tm --method both --network cnn --config "configfiles/extra/data_options.yaml" --max_steps 50
+python3 -m ktc train --whichos remote --modalities am ec tm --method both --network cnn --config "configfiles/extra/data_options.yaml" --max_steps 50
+python3 -m ktc train --whichos remote --modalities am pc tm --method both --network cnn --config "configfiles/extra/data_options.yaml" --max_steps 50
+python3 -m ktc train --whichos remote --modalities am tm --method both --network cnn --config "configfiles/extra/data_options.yaml" --max_steps 50
+python3 -m ktc train --whichos remote --modalities dc ec pc --method both --network cnn --config "configfiles/extra/data_options.yaml" --max_steps 50
+python3 -m ktc train --whichos remote --modalities am dc ec pc tm --method both --network cnn --config "configfiles/extra/data_options.yaml" --max_steps 50
