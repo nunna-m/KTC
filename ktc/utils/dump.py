@@ -6,6 +6,7 @@ provide vairous functions to dump data
 import pickle
 import json
 import os
+from datetime import datetime
 
 # external
 import yaml
@@ -29,7 +30,9 @@ def dump_options(path, avoid_overwrite=False, **options):
     '''
     while os.path.exists(path):
         base = os.path.basename(path)
-        new_base = '{}_{}'.format(*os.path.splitext(base))
+        file, extension = os.path.splitext(base)
+        current_time = datetime.today().strftime('%m%d-%H%M')
+        new_base = '{}_{}{}'.format(file, current_time, extension)
         path = os.path.join(os.path.dirname(path), new_base)
 
     format_ = os.path.splitext(path)[1][1:]
