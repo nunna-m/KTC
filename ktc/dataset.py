@@ -35,6 +35,9 @@ def train_ds(
         rotate90_img: {},
         rotate180_img: {},
         rotate270_img: {},
+        up_rotate90_img: {},
+        up_rotate180_img: {},
+        up_rotate270_img: {},
     }
     print("calling the new dataset file")
     with open(data_root,'r') as file:
@@ -424,6 +427,9 @@ def augmentation(dataset, methods=None):
         rotate90_img: {},
         rotate180_img: {},
         rotate270_img: {},
+        up_rotate90_img: {},
+        up_rotate180_img: {},
+        up_rotate270_img: {},
         }
     else:
         assert isinstance(methods, dict)
@@ -487,6 +493,44 @@ def rotate270_img(dataset):
 def rotate270(img, label):
     img = tf.image.rot90(img, k=3)
     return img, label
+
+def up_rotate90_img(dataset):
+    dataset = dataset.map(
+        lambda img, label: up_rotate90(img, label),
+        num_parallel_calls=tf.data.experimental.AUTOTUNE,
+    )
+    return dataset
+
+def up_rotate90(img, label):
+    img = tf.image.flip_up_down(img)
+    img = tf.image.rot90(img, k=1)
+    return img, label
+
+def up_rotate180_img(dataset):
+    dataset = dataset.map(
+        lambda img, label: up_rotate180(img, label),
+        num_parallel_calls=tf.data.experimental.AUTOTUNE,
+    )
+    return dataset
+
+def up_rotate180(img, label):
+    img = tf.image.flip_up_down(img)
+    img = tf.image.rot90(img, k=2)
+    return img, label
+
+def up_rotate270_img(dataset):
+    dataset = dataset.map(
+        lambda img, label: up_rotate270(img, label),
+        num_parallel_calls=tf.data.experimental.AUTOTUNE,
+    )
+    return dataset
+
+def up_rotate270(img, label):
+    img = tf.image.flip_up_down(img)
+    img = tf.image.rot90(img, k=3)
+    return img, label
+
+
 
 def configure_dataset(dataset, batch_size, buffer_size, repeat=False):
     dataset = dataset.shuffle(buffer_size)

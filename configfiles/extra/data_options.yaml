@@ -26,6 +26,9 @@ data_options:
             rotate90:
             rotate180:
             rotate270:
+            up_rotate90:
+            up_rotate180:
+            up_rotate270:
 
     eval:
         batch_size: 32
