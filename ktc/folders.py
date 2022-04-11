@@ -45,10 +45,11 @@ def count_fromFiles(path, split):
     classes = {'AML':0,'CCRCC':0}
     for subject in data:
         parts = subject.rsplit(os.path.sep, 4)
-        mods = parts[1]
+        mods = parts[1].split('_')
         clas = parts[3]
         #print(clas)
-        classes[clas] += len(os.listdir(os.path.join(subject,mods)))
+        for mod in mods:
+            classes[clas] += len(os.listdir(os.path.join(subject,mod)))
     
     return classes['AML'], classes['CCRCC']
 
