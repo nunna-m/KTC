@@ -1,6 +1,7 @@
 data_options:
     split_CTMRI: False
     cv: 5
+    metrics_file_name: '7Augmentations'
     remote:
         data_path:
             /kw_resources/datasets/kt_new_trainvaltest
