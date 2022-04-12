@@ -1,7 +1,7 @@
 data_options:
     split_CTMRI: False
     cv: 5
-    metrics_file_name: 'vgg16-7Aug-50ep'
+    metrics_file_name: 'vgg16-oldAug-50ep'
     remote:
         data_path:
             /kw_resources/datasets/kt_new_trainvaltest
@@ -23,13 +23,10 @@ data_options:
         output_size: [224, 224]
         tumor_region_only: True
         aug_configs:
-            flip_leftright:
-            rotate90:
-            rotate180:
-            rotate270:
-            up_rotate90:
-            up_rotate180:
-            up_rotate270:
+            random_horizontalflip:
+            random_verticalflip:
+            random_rotation:
+            random_brightness:
 
     eval:
         batch_size: 32
