@@ -83,9 +83,9 @@ class linearCombiCNN(Model):
         self.compressNeuronPhase3 = layers.Dense(1, activation=activation)
         self.concat = layers.Concatenate()
         self.middleLayer = layers.Dense(3, activation=activation)
-        self.linearchannel1 = layers.Dense(224, activation=activation)
-        self.linearchannel2 = layers.Dense(224, activation=activation)
-        self.linearchannel3 = layers.Dense(224, activation=activation)
+        self.linearchannel1 = layers.Dense(224*224, activation=activation)
+        self.linearchannel2 = layers.Dense(224*224, activation=activation)
+        self.linearchannel3 = layers.Dense(224*224, activation=activation)
 
         self.linearupsample = layers.Dense(self.num_neurons*self.num_neurons*3, activation=activation)
         self.reshape = layers.Reshape((self.num_neurons,self.num_neurons,3))
@@ -102,32 +102,37 @@ class linearCombiCNN(Model):
         self.dense = layers.Dense(64)
         self.classify = layers.Dense(num_classes, activation=classifier_activation)
 
-        self.lambdaa1 = layers.Lambda(lambda x: x[:,:,:,0][...,None])
-        self.lambdaa2 = layers.Lambda(lambda x: x[:,:,:,1][...,None])
-        self.lambdaa3 = layers.Lambda(lambda x: x[:,:,:,2][...,None])
+        self.lambdaa1 = layers.Lambda(lambda x: x[:,:,:,0], input_shape=(self.num_neurons, self.num_neurons, self.num_phases))
+        self.lambdaa2 = layers.Lambda(lambda x: x[:,:,:,1:2][...,None], input_shape=(self.num_neurons, self.num_neurons, self.num_phases))
+        self.lambdaa3 = layers.Lambda(lambda x: x[:,:,:,2][...,None], input_shape=(self.num_neurons, self.num_neurons, self.num_phases))
     
     def filter_layer(self, input, index):
-        return self.lambdaa[index](input)
+        x = input[:,:,:,index]
+        x = tf.expand_dims(x, axis=3)
+        #print(x.shape)
+        return x
 
     @tf.function
     def call(self, input_tensor, training=False):
         
-        input0 = self.linearphase1(self.lambdaa1(input_tensor))
-        input1 = self.linearphase2(self.lambdaa2(input_tensor))
-        input2 = self.linearphase3(self.lambdaa3(input_tensor))
-
+        #middle = self.middleLayer(self.concat([neuron0, neuron1, neuron2]))
+        
+        input0 = self.filter_layer(input_tensor,0)
         neuron0 = self.compressNeuronPhase1(input0)
+        #neuron0 = self.compressNeuronPhase1(neuron0)
+        channel0 = self.flatten(neuron0)
+        #print("input 0, neuron0, channel0: ", input0.shape, neuron0.shape, channel0.shape)
+        
+        input1 = self.filter_layer(input_tensor,1)
         neuron1 = self.compressNeuronPhase2(input1)
+        channel1 = self.flatten(neuron1)
+        
+        input2 = self.filter_layer(input_tensor,2)
         neuron2 = self.compressNeuronPhase3(input2)
-
-        middle = self.middleLayer(self.concat([neuron0, neuron1, neuron2]))
-
-        channel0 = self.linearchannel1(middle)
-        channel1 = self.linearchannel2(middle)
-        channel2 = self.linearchannel3(middle)
+        channel2 = self.flatten(neuron2)
 
         x = self.concat([channel0, channel1, channel2])
-        #x = self.reshape(x)
+        x = self.reshape(x)
         x = self.conv1(x)
         x = self.conv2(x)
         x = self.conv3(x)
@@ -136,7 +141,6 @@ class linearCombiCNN(Model):
         x = self.drop(x)
         x = self.classify(x)
         return x
-    
 
 class oldCNN(Model):
     def __init__(

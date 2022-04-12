@@ -122,6 +122,7 @@ def train(
         tf.keras.backend.clear_session()
 
         num_neurons = 2
+        dim = (224,224,3)
         n_trainsteps = folders.count_total(send_path,'train')//batch_size
         if network == 'cnn':
             model = vanillacnn.CNN(classifier_activation='softmax',num_classes=num_neurons)
