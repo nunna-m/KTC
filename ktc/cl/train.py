@@ -125,6 +125,10 @@ def train(
         n_trainsteps = folders.count_total(send_path,'train')//batch_size
         if network == 'cnn':
             model = vanillacnn.CNN(classifier_activation='softmax',num_classes=num_neurons)
+        elif network == 'linearcombicnn':
+            model = vanillacnn.linearCombiCNN(classifier_activation='softmax',num_classes=num_neurons)
+        elif network == 'oldcnn':
+            model = vanillacnn.oldCNN(classifier_activation='softmax',num_classes=num_neurons)
         model.compile(
             optimizer=tf.keras.optimizers.Adam(learning_rate=base_learning_rate),
             loss=tf.keras.losses.CategoricalCrossentropy(),
@@ -186,7 +190,7 @@ def train(
         eval_metrics['FN'] = fn
         eval_metrics['accuracy'] = np.round_(acc,roundoff)
         eval_metrics['AUC'] = plot_roc(y_test.argmax(axis=-1),y_pred.argmax(axis=-1), sendpath)
-        #plot_loss_acc(results, sendpath, network=network)
+        plot_loss_acc(results, sendpath, network=network)
         f2 = plot_confmat(tp, fp, tn, fn, sendpath, roundoff)
         eval_metrics['f2'] = np.round_(f2,roundoff)
         eval_metrics['recall'] = np.round_((tp/(tp+fn)),roundoff)
@@ -305,10 +309,11 @@ def plot_loss_acc(history, path, network):
     metric = 'loss'
     fig = plt.figure()
     plt.plot(req[metric])
-    plt.plot(req['val_'+metric])
+    #plt.plot(req['val_'+metric])
     plt.title(network+' fine tuning model '+metric)
     plt.xlabel('epoch')
-    plt.legend(['train','val'], loc= 'upper left')
+    #plt.legend(['train','val'], loc= 'upper left')
+    plt.legend(['train'], loc= 'upper left')
     plt.savefig(os.path.join(path,metric+'.png'))
     plt.close(fig)
 
@@ -316,10 +321,11 @@ def plot_loss_acc(history, path, network):
     metric = 'accuracy'
     fig2 = plt.figure()
     plt.plot(req[metric])
-    plt.plot(req['val_'+metric])
+    #plt.plot(req['val_'+metric])
     plt.title(network+' fine tuning model '+metric)
     plt.xlabel('epoch')
-    plt.legend(['train','val'], loc= 'upper left')
+    #plt.legend(['train','val'], loc= 'upper left')
+    plt.legend(['train'], loc= 'upper left')
     plt.savefig(os.path.join(path,metric+'.png'))
     plt.close(fig2)
 
