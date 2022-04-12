@@ -151,7 +151,7 @@ class vgg16_net(Model):
         self,
         activation='relu',
         classifier_activation='softmax',
-        classifier_neurons=1,
+        classifier_neurons=2,
         **kargs,
     ):
         super().__init__(**kargs)

@@ -130,6 +130,8 @@ def train(
             model = vanillacnn.linearCombiCNN(classifier_activation='softmax',num_classes=num_neurons)
         elif network == 'oldcnn':
             model = vanillacnn.oldCNN(classifier_activation='softmax',num_classes=num_neurons)
+        elif network == 'vgg16':
+            model = transfer_models.vgg16_net(classifier_activation='softmax')
         model.compile(
             optimizer=tf.keras.optimizers.Adam(learning_rate=base_learning_rate),
             loss=tf.keras.losses.CategoricalCrossentropy(),

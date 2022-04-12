@@ -4,4 +4,4 @@ RUN apt install -y git python3-pip libsm6 libxext6 libxrender-dev libgl1-mesa-gl
 RUN git clone https://github.com/nunna-m/KidneyTumorClassification
 WORKDIR KidneyTumorClassification
 RUN pip3 install -r requirements.txt
-ENTRYPOINT ["bash", "/KidneyTumorClassification/cmdline.sh"]
+ENTRYPOINT ["bash", "/KidneyTumorClassification/bash/cmdline.sh"]
