@@ -91,14 +91,19 @@ class linearCombiCNN(Model):
         self.reshape = layers.Reshape((self.num_neurons,self.num_neurons,3))
 
         self.conv1 = layers.Conv2D(64, 5, strides=2, activation=activation)
+        self.max  = layers.MaxPooling2D()
+        self.bn   = layers.BatchNormalization()
 
+        # Layer of Block 2
         self.conv2 = layers.Conv2D(128, 5, strides=2, activation=activation)
-        self.drop  = layers.Dropout(0.3)
 
+        # Layer of Block 3
         self.conv3 = layers.Conv2D(256, 3, strides=2, activation=activation)
         self.drop  = layers.Dropout(0.5)
 
         self.flatten = layers.Flatten()
+        # GAP, followed by Classifier
+        self.gap   = layers.GlobalAveragePooling2D()
         self.dense = layers.Dense(64)
         self.classify = layers.Dense(num_classes, activation=classifier_activation)
 
@@ -134,8 +139,22 @@ class linearCombiCNN(Model):
         x = self.concat([channel0, channel1, channel2])
         x = self.reshape(x)
         x = self.conv1(x)
+        x = self.max(x)
+        #x = self.bn(x)
+
+        # forward pass: block 2 
         x = self.conv2(x)
+        x = self.max(x)
+        #x = self.bn(x)
+
+        # forward pass: block 3 
         x = self.conv3(x)
+        x = self.max(x)
+        #x = self.bn(x)
+
+        # droput followed by gap and classifier
+        #x = self.drop(x)
+        #x = self.gap(x)
         x = self.flatten(x)
         x = self.dense(x)
         x = self.drop(x)
