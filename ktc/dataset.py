@@ -31,6 +31,15 @@ def train_ds(
             'random_crop':{},
         }
     default_aug_configs = {
+        random_crop_img: dict(output_size=output_size),
+        random_horizontalflip_img: {},
+        random_verticalflip_img: {},
+        random_contrast_img:  dict(channels=list(range(len(modalities)))),
+        random_brightness_img: {},
+        random_hue_img: {},
+        random_saturation_img: {},
+        random_rotation_img: {},
+        random_shear_img: {},
         flip_leftright_img: {},
         rotate90_img: {},
         rotate180_img: {},
@@ -423,6 +432,15 @@ def parse_aug_configs(configs, default_configs=None):
 def augmentation(dataset, methods=None):
     if methods is None:
         methods = {
+        random_crop_img: {},
+        random_horizontalflip_img: {},
+        random_verticalflip_img: {},
+        random_contrast_img:  {},
+        random_brightness_img: {},
+        random_hue_img: {},
+        random_saturation_img: {},
+        random_rotation_img: {},
+        random_shear_img: {},
         flip_leftright_img: {},
         rotate90_img: {},
         rotate180_img: {},
@@ -530,7 +548,137 @@ def up_rotate270(img, label):
     img = tf.image.rot90(img, k=3)
     return img, label
 
+def random_crop_img(dataset, **configs):
+    dataset = dataset.map(
+        lambda image,label: random_crop(image, label,**configs),
+        num_parallel_calls=tf.data.experimental.AUTOTUNE,
+    )
+    return dataset
 
+def random_crop(img, label, output_size=(224,224), stddev=4, max_=6, min_=-6):
+    threshold = tf.clip_by_value(tf.cast(tf.random.normal([2],stddev=stddev), tf.int32), min_, max_)
+    diff = (tf.shape(img)[:2] - output_size) // 2 + threshold
+    img = tf.image.crop_to_bounding_box(
+        img,
+        diff[0],
+        diff[1],
+        *output_size,
+    )
+    return img, label
+
+def random_horizontalflip_img(dataset):
+    dataset = dataset.map(
+        lambda image, label: random_horizontalflip(image, label),
+        num_parallel_calls=tf.data.experimental.AUTOTUNE,
+    )
+    return dataset
+
+def random_horizontalflip(image, label):
+    image = tf.image.random_flip_left_right(image)
+    return image, label
+
+def random_verticalflip_img(dataset):
+    dataset = dataset.map(
+        lambda image, label:
+        random_verticalflip(image, label),
+        num_parallel_calls=tf.data.experimental.AUTOTUNE,
+    )
+    return dataset
+
+def random_verticalflip(image, label):
+    image = tf.image.random_flip_up_down(image)
+    return image, label
+
+def random_contrast_img(dataset, channels, lower=0.8, upper=1.2):
+    dataset = dataset.map(
+        lambda image, label: random_contrast(image, label,lower=lower, upper=upper, channels=channels),
+        num_parallel_calls=tf.data.experimental.AUTOTUNE,
+    )
+    return dataset
+
+def random_contrast(img, label, lower, upper, channels):
+    skip_channels = [i for i in range(img.shape[-1]) if i not in channels]
+
+    picked_channels_img = tf.gather(img, channels, axis=2)
+    skipped_channels_img = tf.gather(img, skip_channels, axis=2)
+    final_img = tf.image.random_contrast(picked_channels_img, lower=lower, upper=upper)
+    img = tf.concat([final_img, skipped_channels_img], axis=2)
+    indices = list(map(
+        lambda CW: CW[1],
+        sorted(zip(channels+skip_channels, range(1000)),
+        key=lambda CW:CW[0],
+                ),
+    ))
+    print("INDICESS----:",indices)
+    img = tf.gather(img, indices, axis=2)
+    return img, label
+
+def random_brightness_img(dataset, max_delta=0.2):
+    dataset = dataset.map(
+        lambda img,label: random_brightness(img,label,
+        max_delta=max_delta),
+        num_parallel_calls=tf.data.experimental.AUTOTUNE,
+    )
+    return dataset
+
+def random_brightness(image, label, max_delta):
+    image = tf.image.random_brightness(image, max_delta=max_delta)
+    return image, label
+
+def random_saturation_img(dataset, lower=5, upper=10):
+    dataset = dataset.map(
+        lambda img, label: random_saturation(img, label,
+        lower=lower, upper=upper),
+        num_parallel_calls=tf.data.experimental.AUTOTUNE,
+    )
+    return dataset
+
+def random_saturation(image, label, lower, upper):
+    if image.shape[-1]<3:
+        return image, label
+    image = tf.image.random_saturation(image,
+        lower=lower, upper=upper)
+    return image, label
+
+def random_hue_img(dataset, max_delta=0.2):
+    dataset = dataset.map(
+        lambda img, label: random_hue(img, label,max_delta=max_delta),
+        num_parallel_calls=tf.data.experimental.AUTOTUNE,
+    )
+    return dataset
+
+def random_hue(image, label, max_delta):
+    if image.shape[-1]<3:
+        return image, label
+    image = tf.image.random_hue(image, max_delta=max_delta)
+    return image, label
+
+def random_rotation_img(dataset):
+    dataset = dataset.map(
+        lambda img, label: random_rotation(img, label),
+        num_parallel_calls=tf.data.experimental.AUTOTUNE,
+    )
+    return dataset
+
+def random_rotation(img, label, angle_range=(-5,5),interpolation='bilinear',fill_mode='nearest'):
+    angle = tf.random.uniform(shape=[1], minval=angle_range[0], maxval=angle_range[1])
+    img = tfa.image.rotate(img, angles=angle,
+    interpolation=interpolation,
+    fill_mode=fill_mode)
+    return img, label
+
+def random_shear_img(dataset, x=(-10,10), y=(-10,10)):
+    x_axis = tf.random.uniform(shape=(), minval=y[0], maxval=y[1])
+    y_axis = tf.random.uniform(shape=(), minval=x[0], maxval=x[1])
+    dataset = dataset.map(
+        lambda img, label: random_shear_x_y(img, label, x_axis=x_axis, y_axis=y_axis)
+    )
+    return dataset
+
+def random_shear_x_y(image, label, x_axis, y_axis):
+    image = tfa.image.shear_x(image, y_axis, [1])
+    image = tfa.image.shear_y(image, x_axis, [1])
+    return image, label
 
 def configure_dataset(dataset, batch_size, buffer_size, repeat=False):
     dataset = dataset.shuffle(buffer_size)
