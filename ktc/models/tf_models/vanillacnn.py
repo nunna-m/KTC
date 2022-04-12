@@ -139,22 +139,8 @@ class linearCombiCNN(Model):
         x = self.concat([channel0, channel1, channel2])
         x = self.reshape(x)
         x = self.conv1(x)
-        x = self.max(x)
-        #x = self.bn(x)
-
-        # forward pass: block 2 
         x = self.conv2(x)
-        x = self.max(x)
-        #x = self.bn(x)
-
-        # forward pass: block 3 
         x = self.conv3(x)
-        x = self.max(x)
-        #x = self.bn(x)
-
-        # droput followed by gap and classifier
-        #x = self.drop(x)
-        #x = self.gap(x)
         x = self.flatten(x)
         x = self.dense(x)
         x = self.drop(x)
