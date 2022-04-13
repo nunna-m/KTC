@@ -1,7 +1,7 @@
 data_options:
     split_CTMRI: False
     cv: 5
-    metrics_file_name: 'vgg16-oldAug-50ep'
+    metrics_file_name: 'oldcnn-oldAug-50ep'
     remote:
         data_path:
             /kw_resources/datasets/kt_new_trainvaltest

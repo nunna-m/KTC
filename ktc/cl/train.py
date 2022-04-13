@@ -61,13 +61,14 @@ def train(
     print("Operating System: {}".format(whichos))
     print("Method: %s"%method)
     #network = str(network[0])
+
+    metrics_file_name = config['data_options']['metrics_file_name']
     oldSavePath = os.path.join(config['data_options'][whichos]['save_path'],network)
-    save_path = os.path.join(config['data_options'][whichos]['save_path'],network,'_'.join(modalities))
+    save_path = os.path.join(config['data_options'][whichos]['save_path'],metrics_file_name,'_'.join(modalities))
     oldDataPath = config['data_options'][whichos]['data_path']
     data_path = os.path.join(config['data_options'][whichos]['data_path'],'_'.join(modalities))
     split_CTMRI = config['data_options']['split_CTMRI']
     cv = int(config['data_options']['cv'])
-    metrics_file_name = config['data_options']['metrics_file_name']
     dump.dump_options(
         os.path.join(save_path, 'options_'+network+'_{}CV.yaml'.format(cv)),
         avoid_overwrite=True,
