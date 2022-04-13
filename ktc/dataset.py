@@ -621,7 +621,7 @@ def random_brightness_img(dataset, max_delta=0.2):
     )
     return dataset
 
-def random_brightness(image, label, max_delta):
+def random_brightness(image, label, max_delta=0.2):
     image = tf.image.random_brightness(image, max_delta=max_delta)
     return image, label
 
