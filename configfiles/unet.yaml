@@ -1,9 +1,0 @@
-model: UNetAnnotator
-model_options:
-    n_filters_first: 3
-    n_downsample: 3
-    rate: 2
-    kernel_size: 3
-    conv_stride: 1
-    bn: false
-    padding: same
