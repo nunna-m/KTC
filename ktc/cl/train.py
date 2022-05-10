@@ -202,7 +202,7 @@ def train(
 
         print(eval_metrics)
 
-        metrics_path = os.path.join(oldSavePath,'metrics_'+metrics_file_name+'.csv')
+        metrics_path = os.path.join(save_path,'metrics_'+metrics_file_name+'.csv')
         if not os.path.exists(metrics_path):
             df = pd.DataFrame(columns=colnames)
             df = df.append(eval_metrics,ignore_index=True)
