@@ -169,7 +169,10 @@ def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,2
             tf.data.experimental.AUTOTUNE,
         )
     ds = tf.data.Dataset.zip((feature_ds, label_ds))
-    norm = 3
+    if len(modalities) <= 3:
+        norm = 3
+    else:
+        norm = len(modalities)
     ds = ds.map(lambda image, label: tf_reshape_cast_normalize(image, label, num_mod=norm, dtype=dtype), tf.data.experimental.AUTOTUNE)
     return ds
 
