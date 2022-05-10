@@ -26,6 +26,19 @@ def train_ds(
     aug_configs=None,
     tumor_region_only=False,
 ):
+    '''
+    create train dataset
+
+    Args:
+        data_root: file with training and testing subject filenames for a specific CV fold, 'train' key filenames indicating train data is selected
+        modalities: ct or mri or both modalities
+        batch_size: batch size
+        buffer_size: buffer_size
+        repeat: flag indicating if dataset be repeated defaults True
+        output_size: size of images in the dataset defaults (224,224)
+        aug_configs (dict): augmentation configurations
+        tumor_region_only: flag indicating cropped to rectangular box around tumor defaults False
+    '''
     if aug_configs is None:
         aug_configs = {
             'random_crop':{},
@@ -48,16 +61,9 @@ def train_ds(
         up_rotate180_img: {},
         up_rotate270_img: {},
     }
-    print("calling the new dataset file")
     with open(data_root,'r') as file:
         data = yaml.safe_load(file)
     traindir = data['train']
-    # if cv:
-    #     with open(data_root,'r') as file:
-    #         data = yaml.safe_load(file)
-    #     traindir = data['train']
-    # else:
-    #     traindir = os.path.join(data_root,'_'.join(modalities),'train')
     dataset = load_raw(
         traindir,
         modalities=modalities,
@@ -83,10 +89,19 @@ def eval_ds(
     data_root,
     modalities,
     batch_size,
-    include_meta=False,
     output_size=(224,224),
     tumor_region_only=False,
 ):
+    '''
+    create validation dataset (not in use when crossvalidation being used)
+
+    Args:
+        data_root: file with validation subject filenames
+        modalities: ct or mri or both modalities
+        batch_size: batch size
+        output_size: size of images in the dataset defaults (224,224)
+        tumor_region_only: flag indicating cropped to rectangular box around tumor defaults False
+    '''
     evaldir = os.path.join(data_root,'_'.join(modalities),'val')
     ds = load_raw(
         evaldir,
@@ -102,34 +117,41 @@ def predict_ds(data_root,
          modalities,
          batch_size,
          output_size=(224,224),
-         tumor_region_only=False,):
+         tumor_region_only=False,
+):
+    '''
+    create testing dataset
+
+    Args:
+        data_root: file with training and testing subject filenames for a specific CV fold, 'test' key filenames indicating test data is selected
+        modalities: ct or mri or both modalities
+        batch_size: batch size
+        output_size: size of images in the dataset defaults (224,224)
+        tumor_region_only: flag indicating cropped to rectangular box around tumor defaults False
+    '''
     with open(data_root,'r') as file:
         data = yaml.safe_load(file)
     testdir = data['test']
-    print("Len of test: ",len(testdir))
-    # if cv:
-    #     #print("entered cv in predict ds")
-    #     with open(data_root,'r') as file:
-    #         data = yaml.safe_load(file)
-    #     testdir = data['test']
-    #     #print(testdir, len(testdir))
-    # else:
-    #     testdir = os.path.join(data_root,'_'.join(modalities),'test')
     ds = load_raw(testdir,modalities=modalities, output_size=output_size, tumor_region_only=tumor_region_only)
     ds = ds.batch(batch_size)
     return ds
 
-def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,224), tumor_region_only=False, dtype=tf.float32):
+def load_raw(traindir, 
+            modalities=('am','tm','dc','ec','pc'), 
+            output_size=(224,224), 
+            tumor_region_only=False, 
+            dtype=tf.float32
+):
+    '''
+    generate the basic raw dataset
+
+    Args:
+        traindir list[str]: list of training subject directories
+        modalities: ct or mri or both modalities
+        tumor_region_only: flag indicating cropped to rectangular box around tumor defaults False
+        dtype: type to convert to defaults float32
+    '''
     training_subject_paths = traindir
-    multiclass = True
-    # if cv:
-    #     training_subject_paths = traindir
-    #     multiclass = True
-    # else:
-    #     training_subject_paths = glob.glob(os.path.join(traindir,*'*'*2))
-    #     multiclass = False
-    
-    #print("data len: ",len(training_subject_paths))
     ds = tf.data.Dataset.from_tensor_slices(training_subject_paths)
     label_ds = ds.interleave(
             partial(
@@ -140,13 +162,8 @@ def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,2
             cycle_length=count(ds),
             num_parallel_calls=tf.data.experimental.AUTOTUNE,
         )
-    # counting = 0
-    # for ele in label_ds.as_numpy_iterator():
-    #     #print(ele)
-    #     counting+=1
-    # print("test data label count inside load raw: ",counting)
-    if multiclass:
-        label_ds = label_ds.map(convert_one_hot)
+    #convert to one_hot because using categorical crossentropy loss function
+    label_ds = label_ds.map(convert_one_hot)
     feature_ds = ds.interleave(
             partial(
                 tf_combine_modalities,
@@ -177,29 +194,30 @@ def load_raw(traindir, modalities=('am','tm','dc','ec','pc'), output_size=(224,2
     return ds
 
 def convert_one_hot(label):
+    '''
+    convert binary labels to one-hot encoding labels
+    '''
     label = tf.one_hot(label,2, dtype=tf.int32)
     return label
 
 def tf_reshape_cast_normalize(image, label, num_mod, dtype):
+    '''
+    Normalize the images in tf.data.dataset format
+    Reshape to required size
+    cast to correct data type
+    mean standardize
+    '''
     print("in tf_reshape: ",image.shape)
     image = tf.reshape(image, [*image.shape[:-1], num_mod])
     image = tf.cast(image, dtype=dtype)
     image = (image / 127.5)
     image = (image-1)
-    #label.set_shape([1])
-    return image, label
-
-def tf_crop_bounding_box(image, label, output_size):
-    image = tf.image.crop_to_bounding_box(
-        image,
-        ((tf.shape(image)[:2] - output_size) // 2)[0],
-        ((tf.shape(image)[:2] - output_size) // 2)[1],
-        *output_size,
-    )
-    #print(image.shape, label.shape)
     return image, label
 
 def tf_combine_labels(subject_path, modalities,return_type='array'):
+    '''
+    outer function to stack different labels of each modality for every subject
+    '''
     return_type  =return_type.lower()
     modality = modalities[0]
     if return_type == 'array':
@@ -217,13 +235,14 @@ def tf_combine_labels(subject_path, modalities,return_type='array'):
     else: raise NotImplementedError
 
 def get_label(subject, modality):
-    #print("inside get label")
-    #print(subject, modality)
+    '''
+    get label of image from file or directory name
+    convert into number tensor and create an array of repeated label values for as many number of slices
+    '''
     if isinstance(subject, str): 
         pass
     elif isinstance(subject, tf.Tensor): 
         subject = subject.numpy().decode()
-        #modality = modality.numpy().decode()
     else: raise NotImplementedError
     clas, _ = get_class_ID_subjectpath(subject)
     required_path = os.path.join(subject, modality)
@@ -234,11 +253,12 @@ def get_label(subject, modality):
     elif clas=='CCRCC':
         label = tf.constant([1], tf.int32)
     final = tf.tile(label, num_slices)
-    #print("labels in get_label: ",final.numpy())
     return final
-    #yield final
 
 def tf_combine_modalities(subject_path, output_size, modalities, tumor_region_only,return_type='array'):
+    '''
+    outer function to stack different images of each modality for every subject
+    '''
     return_type  =return_type.lower()
     if return_type == 'array':
         return tf.py_function(
@@ -257,6 +277,12 @@ def tf_combine_modalities(subject_path, output_size, modalities, tumor_region_on
     else: raise NotImplementedError
 
 def combine_modalities(subject, output_size, modalities, tumor_region_only):
+    '''
+    inner function to stack different labels of each modality for every subject
+    if number of modalities is 1, create a copy of same image 3 times to make 3D image
+    if number of modalities is 2, concatenate with empty array
+    if number of modalities >= 3, use as is
+    '''
     if isinstance(subject, str): pass
     elif isinstance(subject, tf.Tensor): subject = subject.numpy().decode()
     else: raise NotImplementedError
@@ -285,7 +311,23 @@ def combine_modalities(subject, output_size, modalities, tumor_region_only):
         subject_path=subject_data['subject_path'],
     )
 
-def parse_subject(subject_path, output_size, modalities,tumor_region_only, decoder=tf.image.decode_image, resize=tf.image.resize):
+def parse_subject(subject_path, 
+                    output_size, 
+                    modalities,
+                    tumor_region_only, 
+                    decoder=tf.image.decode_image, 
+                    resize=tf.image.resize):
+    '''
+    take directory of subject and return decoded images stack them according to image sample number for each modality
+    
+    Args:
+        subject_path: subject directory with the images of various modalites
+        output_size: final size to which images are resized before returning
+        modalities: ct or mri or both
+        tumor_region_only (bool): true indicates cropping to a rectangular box around the tumor region
+        decoder: tensorflow decode_image function that is used to read the image into a tensor, used when tumor_region_only is False, when it is True, opencv imgread is used
+        resize: tensorflow resize function to perform resize operation
+    '''
     subject_data = {'subject_path': subject_path}
     subject_data['clas'], subject_data['ID'] = get_class_ID_subjectpath(subject_path)
     gathered_modalities_paths = {
@@ -343,6 +385,9 @@ def parse_subject(subject_path, output_size, modalities,tumor_region_only, decod
     return subject_data
 
 def get_class_ID_subjectpath(subject):
+    '''
+    based on subject folder path extract tumor class and subject ID
+    '''
     splitup = subject.split(os.path.sep)
     ID = splitup[-1]
     clas = splitup[-2]
@@ -350,7 +395,9 @@ def get_class_ID_subjectpath(subject):
     return clas, ID
 
 def crop(img, resize_shape, crop_dict):
-    
+    '''
+    crop the image to a rectangular bounding box around the tumor region
+    '''
     tumor_center = {
             'y':crop_dict['y']+(crop_dict['height']//2),
             'x':crop_dict['x']+(crop_dict['width']//2),
@@ -366,10 +413,15 @@ def crop(img, resize_shape, crop_dict):
         assert i>0, f'height or width going out of bounds'
     
     img = tf.convert_to_tensor(img, dtype=tf.uint8)
-    #tf.cast(img, dtype=)
     return img
 
 def get_tumor_boundingbox(imgpath, labelpath):
+    '''
+    get the bounding box coordinates around tumor
+    first calculate center of tumor based on segmentation label
+    then calculate bounding box around it after zooming out by a factor of 0.3 on both heigth and width (just to be sure of including the entire region of the tumor)
+    am modality is gaussian standardized also
+    '''
     orig_image = cv2.imread(imgpath)[:,:,0]
     (orig_height, orig_width) = cv2.imread(imgpath)[:,:,0].shape
     image = cv2.imread(labelpath)
@@ -419,6 +471,9 @@ def get_tumor_boundingbox(imgpath, labelpath):
     return backup
 
 def parse_aug_configs(configs, default_configs=None):
+    '''
+    update dictionary of configs with values provided in the augmnentation config file
+    '''
     if default_configs is None:
         default_configs = {}
     updated_conf = {}
@@ -433,6 +488,9 @@ def parse_aug_configs(configs, default_configs=None):
     return updated_conf    
     
 def augmentation(dataset, methods=None):
+    '''
+    call on the functions specified in the augmentation config file
+    '''
     if methods is None:
         methods = {
         random_crop_img: {},
@@ -466,12 +524,18 @@ def augmentation(dataset, methods=None):
     return dataset
 
 def augmentation_method(method_in_str):
+    '''
+    call on a specific augmentation method
+    '''
     if callable(method_in_str): return method_in_str
     method_in_str.endswith('_img')
     method = vars[method_in_str]
     return method
 
 def flip_leftright_img(dataset):
+    '''
+    flip image left right
+    '''
     dataset = dataset.map(
         lambda image, label: flip_leftright(image, label),
         num_parallel_calls=tf.data.experimental.AUTOTUNE,
@@ -483,6 +547,9 @@ def flip_leftright(image, label):
     return image, label
 
 def rotate90_img(dataset):
+    '''
+    rotate image 90 degrees
+    '''
     dataset = dataset.map(
         lambda img, label: rotate90(img, label),
         num_parallel_calls=tf.data.experimental.AUTOTUNE,
@@ -494,6 +561,9 @@ def rotate90(img, label):
     return img, label
 
 def rotate180_img(dataset):
+    '''
+    rotate image 180 degrees, similar to flip left right
+    '''
     dataset = dataset.map(
         lambda img, label: rotate180(img, label),
         num_parallel_calls=tf.data.experimental.AUTOTUNE,
@@ -505,6 +575,9 @@ def rotate180(img, label):
     return img, label
 
 def rotate270_img(dataset):
+    '''
+    rotate image 270 degrees
+    '''
     dataset = dataset.map(
         lambda img, label: rotate270(img, label),
         num_parallel_calls=tf.data.experimental.AUTOTUNE,
@@ -516,6 +589,9 @@ def rotate270(img, label):
     return img, label
 
 def up_rotate90_img(dataset):
+    '''
+    mirror the image and rotate 90 degrees
+    '''
     dataset = dataset.map(
         lambda img, label: up_rotate90(img, label),
         num_parallel_calls=tf.data.experimental.AUTOTUNE,
@@ -528,6 +604,9 @@ def up_rotate90(img, label):
     return img, label
 
 def up_rotate180_img(dataset):
+    '''
+    mirror the image and rotate 180 degrees
+    '''
     dataset = dataset.map(
         lambda img, label: up_rotate180(img, label),
         num_parallel_calls=tf.data.experimental.AUTOTUNE,
@@ -547,11 +626,17 @@ def up_rotate270_img(dataset):
     return dataset
 
 def up_rotate270(img, label):
+    '''
+    mirror the image and rotate 270 degrees
+    '''
     img = tf.image.flip_up_down(img)
     img = tf.image.rot90(img, k=3)
     return img, label
 
 def random_crop_img(dataset, **configs):
+    '''
+    randomly crop the image from the center
+    '''
     dataset = dataset.map(
         lambda image,label: random_crop(image, label,**configs),
         num_parallel_calls=tf.data.experimental.AUTOTUNE,
@@ -570,6 +655,9 @@ def random_crop(img, label, output_size=(224,224), stddev=4, max_=6, min_=-6):
     return img, label
 
 def random_horizontalflip_img(dataset):
+    '''
+    horizontally flip image randomly (flip or not every image)
+    '''
     dataset = dataset.map(
         lambda image, label: random_horizontalflip(image, label),
         num_parallel_calls=tf.data.experimental.AUTOTUNE,
@@ -581,6 +669,9 @@ def random_horizontalflip(image, label):
     return image, label
 
 def random_verticalflip_img(dataset):
+    '''
+    vertically flip image randomly (flip or not every image)
+    '''
     dataset = dataset.map(
         lambda image, label:
         random_verticalflip(image, label),
@@ -593,6 +684,9 @@ def random_verticalflip(image, label):
     return image, label
 
 def random_contrast_img(dataset, channels, lower=0.8, upper=1.2):
+    '''
+    change image contrast randomly
+    '''
     dataset = dataset.map(
         lambda image, label: random_contrast(image, label,lower=lower, upper=upper, channels=channels),
         num_parallel_calls=tf.data.experimental.AUTOTUNE,
@@ -617,6 +711,9 @@ def random_contrast(img, label, lower, upper, channels):
     return img, label
 
 def random_brightness_img(dataset, max_delta=0.2):
+    '''
+    change image brightness randomly(decide to change the brightness or keep image as is -- meaning of random)
+    '''
     dataset = dataset.map(
         lambda img,label: random_brightness(img,label,
         max_delta=max_delta),
@@ -629,6 +726,9 @@ def random_brightness(image, label, max_delta=0.2):
     return image, label
 
 def random_saturation_img(dataset, lower=5, upper=10):
+    '''
+    change image saturation randomly
+    '''
     dataset = dataset.map(
         lambda img, label: random_saturation(img, label,
         lower=lower, upper=upper),
@@ -644,6 +744,9 @@ def random_saturation(image, label, lower, upper):
     return image, label
 
 def random_hue_img(dataset, max_delta=0.2):
+    '''
+    change image hue randomly
+    '''
     dataset = dataset.map(
         lambda img, label: random_hue(img, label,max_delta=max_delta),
         num_parallel_calls=tf.data.experimental.AUTOTUNE,
@@ -657,6 +760,9 @@ def random_hue(image, label, max_delta):
     return image, label
 
 def random_rotation_img(dataset):
+    '''
+    rotate image at a random angle within a default range
+    '''
     dataset = dataset.map(
         lambda img, label: random_rotation(img, label),
         num_parallel_calls=tf.data.experimental.AUTOTUNE,
@@ -671,6 +777,9 @@ def random_rotation(img, label, angle_range=(-5,5),interpolation='bilinear',fill
     return img, label
 
 def random_shear_img(dataset, x=(-10,10), y=(-10,10)):
+    '''
+    shear image at a random x units and random y units within a default range
+    '''
     x_axis = tf.random.uniform(shape=(), minval=y[0], maxval=y[1])
     y_axis = tf.random.uniform(shape=(), minval=x[0], maxval=x[1])
     dataset = dataset.map(
@@ -684,6 +793,13 @@ def random_shear_x_y(image, label, x_axis, y_axis):
     return image, label
 
 def configure_dataset(dataset, batch_size, buffer_size, repeat=False):
+    '''
+    shuffle
+    repeat
+    batch
+    prefectch
+    call the above functions on every tf.data.dataset generated
+    '''
     dataset = dataset.shuffle(buffer_size)
     if repeat:
         print("entering repeat")
@@ -693,6 +809,9 @@ def configure_dataset(dataset, batch_size, buffer_size, repeat=False):
     return dataset
 
 def count(ds):
+    '''
+    count the number of records in the dataset
+    '''
     size = 0
     for _ in ds: 
         size += 1
