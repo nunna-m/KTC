@@ -1,33 +1,18 @@
 '''
-CLI for train command
+interface for training models
 '''
 
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-from ktc.utils import get, store, load, dump
-from ktc import dataset
-
-'''
-interface for training models
-'''
-
-# built-in
 from datetime import datetime
-
-# external
 import tensorflow as tf
 from tensorflow import keras
 from matplotlib import pyplot as plt
 from sklearn.metrics import auc, roc_curve
 from tqdm.keras import TqdmCallback
 import pandas as pd
-import csv
-import dsargparse
-import yaml
-import tensorboard as tb
 import numpy as np
-# customs
-from ktc.utils import get, store, load, dump
+from ktc.utils import load, dump
 from ktc import dataset, folders
 from ktc.models.tf_models import transfer_models, vanillacnn
 
@@ -123,7 +108,6 @@ def train(
         tf.keras.backend.clear_session()
 
         num_neurons = 2
-        dim = (224,224,3)
         n_trainsteps = folders.count_total(send_path,'train')//batch_size
         if network == 'cnn':
             model = vanillacnn.CNN(classifier_activation='softmax',num_classes=num_neurons)
@@ -173,13 +157,6 @@ def train(
             sendpath = os.path.join(save_models_here,'Fold'+cvFold)
             os.makedirs(sendpath, exist_ok=True)
         colnames = ['Network','Modalities','Fold#','#AML(no)','#CCRCC(yes)','AUC','TP','FP','TN','FN','recall','specificity','f2','accuracy']
-        # y_numpy = []
-        # for iter in testDS.as_numpy_iterator():
-        #     y_numpy.append(iter[1])
-        # y_numpy = y_numpy[0]
-        # y_pred = model.predict(testDS)
-        # y_pred_classes = y_pred.argmax(axis=-1)
-        # y_pred = np.squeeze(y_pred)
         
         eval_metrics = {k:0 for k in colnames}
         roundoff = 3
