@@ -181,6 +181,7 @@ def train(
         if not os.path.exists(metrics_path):
             df = pd.DataFrame(columns=colnames)
             df = df.append(eval_metrics,ignore_index=True)
+            #df.set_index('Network', inplace=True)
             df.to_csv(metrics_path)
         else:
             extra = pd.DataFrame([eval_metrics])
