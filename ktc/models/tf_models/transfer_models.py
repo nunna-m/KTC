@@ -223,16 +223,19 @@ class stackedNet(Model):
         **kargs,
     ):
         super().__init__(**kargs)
-        self.dense = layers.Dense(8, activation=activation)
-        self.dense = layers.Dense(20, activation=activation)
-        self.dense = layers.Dense(10, activation=activation)
+        self.dense1 = layers.Dense(8, activation=activation)
+        self.dense2 = layers.Dense(20, activation=activation)
+        self.dense3 = layers.Dense(10, activation=activation)
         self.classify_dense = layers.Dense(classifier_neurons, activation=classifier_activation)
         
     
     @tf.function
     def call(self, input_tensor, training=False):
-        x = self.dense(input_tensor)
+        x = self.dense1(input_tensor)
+        x = self.dense2(x)
+        x = self.dense3(x)
         x = self.classify_dense(x)
+        print("x.shape=",x.shape)
         return x
     
 def define_stacked_model(model_members):
