@@ -144,6 +144,7 @@ def train_stacked(
         eval_metrics = {k:0 for k in colnames}
         roundoff = 3
         eval_metrics['Network'] = network
+        eval_metrics['Method'] = method
         eval_metrics['Modalities'] = ' '.join(modalities)
         eval_metrics['Fold#'] = i
         eval_metrics['#AML(no)'] = nf_aml
