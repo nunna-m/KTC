@@ -139,7 +139,8 @@ def train_stacked(
         if os.path.isdir(save_path) and os.path.exists(save_path):
             storepath = os.path.join(save_models_here,'Fold'+cvFold,network,method)
             os.makedirs(storepath, exist_ok=True)
-        colnames = ['Network','Modalities','Fold#','#AML(no)','#CCRCC(yes)','AUC','TP','FP','TN','FN','recall','specificity','f2','accuracy','avg_acc']
+        
+        colnames = ['Network','Method','Modalities','Fold#','#AML(no)','#CCRCC(yes)','AUC','TP','FP','TN','FN','recall','specificity','f2','accuracy','avg_acc']
         
         eval_metrics = {k:0 for k in colnames}
         roundoff = 3
