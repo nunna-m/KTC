@@ -48,12 +48,10 @@ def train(
     #network = str(network[0])
 
     metrics_file_name = config['data_options']['metrics_file_name']
-    oldSavePath = os.path.join(config['data_options'][whichos]['save_path'],network)
     save_path = os.path.join(config['data_options'][whichos]['save_path'],metrics_file_name,'_'.join(modalities))
-    oldDataPath = config['data_options'][whichos]['data_path']
     data_path = os.path.join(config['data_options'][whichos]['data_path'],'_'.join(modalities))
-    split_CTMRI = config['data_options']['split_CTMRI']
     cv = int(config['data_options']['cv'])
+    batch_size = config['data_options']['train']['batch_size']
     dump.dump_options(
         os.path.join(save_path, 'options_'+network+'_{}CV.yaml'.format(cv)),
         avoid_overwrite=True,
@@ -65,16 +63,16 @@ def train(
     print("Save Path: {}".format(save_path))
 
     base_learning_rate = 0.00001
-    decay = base_learning_rate / max_steps
-    reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.2,
-                              patience=5, min_lr=base_learning_rate)
-    early_stopping = tf.keras.callbacks.EarlyStopping(
-                    monitor='val_loss',
-                    patience=20,
-                    mode='min',
-                    restore_best_weights=True)
-    def lr_time_based_decay(epoch, lr):
-        return lr * 1 / (1+decay*epoch)
+    # decay = base_learning_rate / max_steps
+    # reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.2,
+    #                           patience=5, min_lr=base_learning_rate)
+    # early_stopping = tf.keras.callbacks.EarlyStopping(
+    #                 monitor='val_loss',
+    #                 patience=20,
+    #                 mode='min',
+    #                 restore_best_weights=True)
+    # def lr_time_based_decay(epoch, lr):
+    #     return lr * 1 / (1+decay*epoch)
     
     METRICS = [
       keras.metrics.TruePositives(name='tp'),
@@ -87,12 +85,9 @@ def train(
       keras.metrics.AUC(name='auc'),
       keras.metrics.AUC(name='prc', curve='PR'), 
     ]
-    batch_size = config['data_options']['train']['batch_size']
 
     fold_acc = []
-    here = cv
-    #here = 1
-    for i in range(here):
+    for i in range(cv):
         send_path = os.path.join(data_path,'{}CV'.format(cv),folds_string.format(i))
         trainDS = dataset.train_ds(send_path, modalities, **config['data_options']['train'])
         testDS = dataset.predict_ds(send_path, modalities, **config['data_options']['test'])
@@ -107,7 +102,7 @@ def train(
         os.makedirs(testdata_filename, exist_ok=True)
         tf.keras.backend.clear_session()
 
-        num_neurons = 2
+        num_neurons = 2 #2 classifier neurons (binary classification)
         n_trainsteps = folders.count_total(send_path,'train')//batch_size
         if network == 'cnn':
             model = vanillacnn.CNN(classifier_activation='softmax',num_classes=num_neurons)
@@ -156,7 +151,7 @@ def train(
         if os.path.isdir(save_path) and os.path.exists(save_path):
             sendpath = os.path.join(save_models_here,'Fold'+cvFold)
             os.makedirs(sendpath, exist_ok=True)
-        colnames = ['Network','Modalities','Fold#','#AML(no)','#CCRCC(yes)','AUC','TP','FP','TN','FN','recall','specificity','f2','accuracy']
+        colnames = ['Network','Modalities','Fold#','#AML(no)','#CCRCC(yes)','AUC','TP','FP','TN','FN','recall','specificity','f2','accuracy','avg_acc']
         
         eval_metrics = {k:0 for k in colnames}
         roundoff = 3
@@ -176,7 +171,10 @@ def train(
         eval_metrics['f2'] = np.round_(f2,roundoff)
         eval_metrics['recall'] = np.round_((tp/(tp+fn)),roundoff)
         eval_metrics['specificity'] = np.round_((tn/(tn+fp)),roundoff)
-
+        if i == cv - 1:
+            eval_metrics['avg_acc'] = np.array(fold_acc).mean()
+        else:
+            eval_metrics['avg_acc'] = 0.0
         print(eval_metrics)
 
         metrics_path = os.path.join(save_path,'metrics_'+metrics_file_name+'.csv')
@@ -200,6 +198,13 @@ def train(
     return
     
 def perf_measure(y_actual, y_hat):
+    '''
+    Calculate True positives, False Positives, True Negatives and False Negatives from predicted labels and actual labels
+    Returns tuple of (TP, FP, TN, FN)
+    Args:
+        y_actual: actual labels (0 or 1 benign/cancerous)
+        y_hat: predicted labels (0 or 1, major class is taken based on bigger number after softmax activation)
+    '''
     TP = 0
     FP = 0
     TN = 0
@@ -219,6 +224,13 @@ def perf_measure(y_actual, y_hat):
     return(TP, FP, TN, FN)
 
 def plot_roc(y_true, y_pred, path):
+    '''
+    plots roc curve and returns auc
+    Args:
+        y_true: actual labels
+        y_pred: predicted labels
+        path: path to store the roc curve image
+    '''
     fpr, tpr, _ = roc_curve(y_true, y_pred)
     fig = plt.figure()
     plt.plot(fpr, tpr)
@@ -232,18 +244,15 @@ def plot_roc(y_true, y_pred, path):
     return auc(fpr, tpr)
 
 def Find_Optimal_Cutoff(target, predicted):
-    """ Find the optimal probability cutoff point for a classification model related to event rate
-    Parameters
-    ----------
-    target : Matrix with dependent or target data, where rows are observations
-
-    predicted : Matrix with predicted data, where rows are observations
-
-    Returns
-    -------     
-    list type, with optimal cutoff value
-        
-    """
+    '''
+    Find the optimal probability cutoff point for a classification model related to event rate
+    Can be used to find youden's index (currently not being used in this)
+    Args:
+        target : Matrix with dependent or target data, where rows are observations
+        predicted : Matrix with predicted data, where rows are observations
+    Returns:
+        list type, with optimal cutoff value
+    '''
     fpr, tpr, threshold = roc_curve(target, predicted)
     i = np.arange(len(tpr)) 
     roc = pd.DataFrame({'tf' : pd.Series(tpr-(1-fpr), index=i), 'threshold' : pd.Series(threshold, index=i)})
@@ -252,12 +261,14 @@ def Find_Optimal_Cutoff(target, predicted):
     return list(roc_t['threshold']) 
 
 def fbeta(tp, fp, tn, fn, beta=2.0):
+    '''return fbeta score based on tp, fp, tn, fn'''
     squared = pow(beta, 2)
     numerator = (1 + squared)*tp
     denominator = ((1 + squared)*tp) + squared*fn + fp
     return numerator/denominator
 
 def plot_confmat(tp, fp, tn, fn, path, roundoff, beta=2.0):
+    '''plot the confusion matrix and store the plot in path'''
     f2 = fbeta(tp, fp, tn, fn, beta)
     print('f2-score: ',f2)
     cf = np.array([[tp,fn],
@@ -284,6 +295,7 @@ def plot_confmat(tp, fp, tn, fn, path, roundoff, beta=2.0):
     return f2
 
 def plot_loss_acc(history, path, network):
+    '''plot loss and accuracy curves (for now only training metrics are plotted because no validation data'''
     req = history.history
     
     #plot training and val loss
