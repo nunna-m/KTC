@@ -17,6 +17,7 @@ folds_string = 'allSubjectPaths{}.yaml'
 def train_stacked(
     whichos,
     method,
+    network,
     config,
     max_steps,
     filename=None,
@@ -27,6 +28,7 @@ def train_stacked(
     Args:
         whichos: operation system linux/windows/remote
         method: either CT or MRI
+        network: which network to use (for level0 networks)
         config (list[str]): config file paths (one or more) first one will be the main config and others will overwrite the main one or add to it
         max_steps (int): maximum training epochs
         filename: desired metrics filename, default is level0_level1_numberofepsochs
@@ -37,18 +39,14 @@ def train_stacked(
     print("Modalities: %s"%modalities)
     print("Operating System: {}".format(whichos))
     print("Method: %s"%method)
-    level_0 = config['data_options']['network_info']['level_0']
-    level_1 = config['data_options']['network_info']['level_1']
-    #metrics_file_name = config['data_options']['metrics_file_name']
-    save_path = os.path.join(config['data_options'][whichos]['save_path'],metrics_file_name,'stacked_allModalities')
-    data_path = os.path.join(config['data_options'][whichos]['data_path'],'_'.join(modalities))
     cv = int(config['data_options']['cv'])
     batch_size = config['data_options']['train']['batch_size']
-    network = '{}_{}'.format(level_0,level_1)
     if not filename:
         metrics_file_name = '{}_{}eps'.format(network,max_steps)
     else:
         metrics_file_name = filename
+    save_path = os.path.join(config['data_options'][whichos]['save_path'],metrics_file_name)
+    data_path = os.path.join(config['data_options'][whichos]['data_path'],'_'.join(modalities))
     dump.dump_options(
         os.path.join(save_path, 'options_'+network+'_{}CV.yaml'.format(cv)),
         avoid_overwrite=True,
@@ -86,22 +84,22 @@ def train_stacked(
         
         cvFold = str(i)
         save_models_here = os.path.join(save_path,'{}CV'.format(cv))        
-        weights_filename = os.path.join(save_models_here,'Fold'+cvFold,level_0,method,'weights/')
-        preds_filename = os.path.join(save_models_here,'Fold'+cvFold,level_0,method,'predictions/')
-        testdata_filename = os.path.join(save_models_here,'Fold'+cvFold,level_0,method,'testdata/')
+        weights_filename = os.path.join(save_models_here,'Fold'+cvFold,network,method,'weights/')
+        preds_filename = os.path.join(save_models_here,'Fold'+cvFold,network,method,'predictions/')
+        testdata_filename = os.path.join(save_models_here,'Fold'+cvFold,network,method,'testdata/')
         os.makedirs(weights_filename, exist_ok=True)
         os.makedirs(preds_filename, exist_ok=True)
         os.makedirs(testdata_filename, exist_ok=True)
         tf.keras.backend.clear_session()
 
         n_trainsteps = folders.count_total(send_path,'train')//batch_size
-        if level_0 == 'cnn':
+        if network == 'cnn':
             model = vanillacnn.CNN()
-        elif level_0 == 'linearcombicnn':
+        elif network == 'linearcombicnn':
             model = vanillacnn.linearCombiCNN()
-        elif level_0 == 'oldcnn':
+        elif network == 'oldcnn':
             model = vanillacnn.oldCNN()
-        elif level_0 == 'vgg16':
+        elif network == 'vgg16':
             model = transfer_models.vgg16_net()
         model.compile(
             optimizer=tf.keras.optimizers.Adam(learning_rate=base_learning_rate),
@@ -133,15 +131,14 @@ def train_stacked(
         np.save(preds_filename+'yhat.npy',y_pred)
         print('Saved into: %s'%weights_filename)
         
-        
         tp, fp, tn, fn = metrics.perf_measure(y_test.argmax(axis=-1),y_pred.argmax(axis=-1))
         acc = (tp+tn) / (tp+fp+tn+fn)
         print("test acc: ",acc)           
         fold_acc.append(acc)
         nf_aml,nf_cc = folders.count_fromFiles(send_path, 'test')
         if os.path.isdir(save_path) and os.path.exists(save_path):
-            sendpath = os.path.join(save_models_here,'Fold'+cvFold)
-            os.makedirs(sendpath, exist_ok=True)
+            storepath = os.path.join(save_models_here,'Fold'+cvFold,network,method)
+            os.makedirs(storepath, exist_ok=True)
         colnames = ['Network','Modalities','Fold#','#AML(no)','#CCRCC(yes)','AUC','TP','FP','TN','FN','recall','specificity','f2','accuracy','avg_acc']
         
         eval_metrics = {k:0 for k in colnames}
@@ -156,9 +153,9 @@ def train_stacked(
         eval_metrics['TN'] = tn
         eval_metrics['FN'] = fn
         eval_metrics['accuracy'] = np.round_(acc,roundoff)
-        eval_metrics['AUC'] = metrics.plot_roc(y_test.argmax(axis=-1),y_pred.argmax(axis=-1), sendpath)
-        metrics.plot_loss_acc(results, sendpath, network=network)
-        f2 = metrics.plot_confmat(tp, fp, tn, fn, sendpath, roundoff)
+        eval_metrics['AUC'] = metrics.plot_roc(y_test.argmax(axis=-1),y_pred.argmax(axis=-1), storepath)
+        metrics.plot_loss_acc(results, storepath, network=network)
+        f2 = metrics.plot_confmat(tp, fp, tn, fn, storepath, roundoff)
         eval_metrics['f2'] = np.round_(f2,roundoff)
         eval_metrics['recall'] = np.round_((tp/(tp+fn)),roundoff)
         eval_metrics['specificity'] = np.round_((tn/(tn+fp)),roundoff)
@@ -187,22 +184,23 @@ def train_stacked(
     print("$$$$$$$$$$$$$$$$$$$$$$$$$")
     return
 
-def meta_learner(whichos, config, max_steps, level0, level1):
+def meta_learner(whichos, config, max_steps, level0, level1, level0_filename):
     '''
-    Train a model specified in level1 of config taking outputs from networks specified as level0 in the config file.
+    Train a model specified in level1 of config taking outputs from level0 networks already trained used train_stacked function
     Args:
         whichos: operation system linux/windows/remote
         config (list[str]): config file paths (one or more) first one will be the main config and others will overwrite the main one or add to it
         max_steps (int): maximum training epochs
         level0 (str) : network at level0 (cnn|vgg16)
         level1 (str) : network at level1 (fc|xgb)
+        level0_filename (str) : folder where level0 weights are stored
         '''
     
     config = load.load_config(config)
     cv = int(config['data_options']['cv'])
     fold_metrics = []
     for fold in range(cv):
-        acc = foldwise_meta_learner(fold, whichos, config, max_steps, level0, level1)
+        acc = foldwise_meta_learner(fold, whichos, config, max_steps, level0, level1, level0_filename)
         fold_metrics.append(acc)
         print("Fold: {}, Accuracy: {}".format(fold, acc))
     
@@ -218,27 +216,23 @@ def foldwise_meta_learner(
     max_steps,
     level_0,
     level_1,
+    level0_filename,
 ):
-    
-    #current_fold = 0
     base_learning_rate = 0.01
     methods = ['CT', 'MRI']
-    #print("Operating System: {}".format(whichos))
-    #print("Methods: {}".format(methods))
-    #level_0 = config['data_options']['network_info']['level_0']
-    #level_1 = config['data_options']['network_info']['level_1']
-    save_models_here = config['data_options'][whichos]['save_models_here']
+    cv = config['data_options']['cv']
+    save_models_here = os.path.join(config['data_options'][whichos]['save_path'],level0_filename,'{}CV'.format(cv),'Fold{}'.format(current_fold))      
+    #save_models_here = config['data_options'][whichos]['save_models_here']
     
-    #ytest will be same for CT or MRI (because subset of am_dc_ec_pc_tm)
-    #loading from either one is enough
-    test_data_path = os.path.join(save_models_here+str(current_fold),level_0,methods[0],'testdata/y.npy')
+    #ytest will be same for CT or MRI (because subset of am_dc_ec_pc_tm)--loading from either one is enough
+    test_data_path = os.path.join(save_models_here,level_0,methods[0],'testdata/y.npy')
     ytest_data = np.load(test_data_path)
     pred_data = dict()
     pred_data_counts = dict()
-    for met in methods:
-        pred_data_path = os.path.join(save_models_here+str(current_fold),level_0,met,'predictions/yhat.npy')
-        pred_data[met] = np.load(pred_data_path)
-        pred_data_counts[met] = pred_data[met].shape[0]
+    for method in methods:
+        pred_data_path = os.path.join(save_models_here,level_0,method,'predictions/yhat.npy')
+        pred_data[method] = np.load(pred_data_path)
+        pred_data_counts[method] = pred_data[method].shape[0]
         #print(met, pred_data[met].shape)
     
     #make CT and MRI same shape
@@ -253,7 +247,7 @@ def foldwise_meta_learner(
     
     #print(len(pred_data['CT']), len(pred_data['MRI']))
     if level_1 == 'fc':
-        model = fit_stacked_model(pred_data=pred_data, methods=methods, ytest=ytest_data, max_steps=max_steps, lr=base_learning_rate)
+        model = fit_stacked_nn(pred_data=pred_data, methods=methods, ytest=ytest_data, max_steps=max_steps, lr=base_learning_rate)
     elif level_1 == 'xgb':
         model = fit_stacked_xgb(pred_data=pred_data, methods=methods, ytest=ytest_data, max_steps=max_steps, lr=base_learning_rate)
     yhat = stacked_prediction(pred_data=pred_data, methods=methods, model=model)
@@ -272,17 +266,18 @@ def foldwise_meta_learner(
 def stacked_dataset(pred_data, methods):
     stackX = None
 
-    for met in methods:
-        yhat = pred_data[met]
+    for method in methods:
+        yhat = pred_data[method]
         if stackX is None:
             stackX = yhat
         else:
             stackX = np.dstack((stackX, yhat))
+        print("method, stackX.shape=",method, stackX.shape)
     stackX = stackX.reshape((stackX.shape[0], stackX.shape[1]*stackX.shape[2]))
     print("Stacked shape: {}".format(stackX.shape))
     return stackX
 
-def fit_stacked_model(pred_data, methods, ytest, max_steps, lr):
+def fit_stacked_nn(pred_data, methods, ytest, max_steps, lr):
     stackedX = stacked_dataset(pred_data, methods)
     model = transfer_models.stackedNet()
     model.compile(
