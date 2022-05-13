@@ -17,8 +17,8 @@ def perf_measure(y_actual, y_hat):
     FP = 0
     TN = 0
     FN = 0
-    #print("y_actual: ",y_actual, len(y_actual))
-    #print("y_hat: ",y_hat, len(y_hat))
+    # print("y_actual: ",y_actual, len(y_actual))
+    # print("y_hat: ",y_hat, len(y_hat))
     for i in range(len(y_hat)): 
         if y_actual[i]==y_hat[i]==1:
            TP += 1
