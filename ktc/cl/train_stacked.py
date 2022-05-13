@@ -1,41 +1,35 @@
-from audioop import avg
 import os
-from pyexpat import model
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-from datetime import datetime
 import tensorflow as tf
 from tensorflow import keras
-from matplotlib import pyplot as plt
-from sklearn.metrics import roc_curve
 from tqdm.keras import TqdmCallback
 import pandas as pd
 import numpy as np
-import yaml
 from sklearn.metrics import accuracy_score
-from sklearn.preprocessing import OneHotEncoder
 
-# customs
-from ktc.utils import get, store, load, dump
+from ktc.utils import load, dump, metrics
 from ktc import dataset, folders
 from ktc.models.tf_models import transfer_models, vanillacnn
 
-N_FOLDS = 5
+folds_string = 'allSubjectPaths{}.yaml'
 
 def train_stacked(
     whichos,
     method,
     config,
     max_steps,
+    filename=None,
 ):
     '''
     Train a stacked model with the networks specified as level0 and level1 in the config file. Stores the cmdline args and other configs in one file for future ref, trains the model, stores results in csv and plots too.
 
     Args:
         whichos: operation system linux/windows/remote
-        method: CT or MRI
+        method: either CT or MRI
         config (list[str]): config file paths (one or more) first one will be the main config and others will overwrite the main one or add to it
         max_steps (int): maximum training epochs
+        filename: desired metrics filename, default is level0_level1_numberofepsochs
         '''
     config = load.load_config(config)
     modalities = ['am', 'dc', 'ec', 'pc', 'tm']
@@ -43,32 +37,29 @@ def train_stacked(
     print("Modalities: %s"%modalities)
     print("Operating System: {}".format(whichos))
     print("Method: %s"%method)
-    save_path = config['data_options'][whichos]['save_path']
-    data_path = config['data_options'][whichos]['data_path']
-    folds_path = config['data_options'][whichos]['folds_path']
     level_0 = config['data_options']['network_info']['level_0']
     level_1 = config['data_options']['network_info']['level_1']
-    save_models_here = config['data_options'][whichos]['save_models_here']
+    #metrics_file_name = config['data_options']['metrics_file_name']
+    save_path = os.path.join(config['data_options'][whichos]['save_path'],metrics_file_name,'stacked_allModalities')
+    data_path = os.path.join(config['data_options'][whichos]['data_path'],'_'.join(modalities))
+    cv = int(config['data_options']['cv'])
+    batch_size = config['data_options']['train']['batch_size']
+    network = '{}_{}'.format(level_0,level_1)
+    if not filename:
+        metrics_file_name = '{}_{}eps'.format(network,max_steps)
+    else:
+        metrics_file_name = filename
     dump.dump_options(
-        os.path.join(save_path, '_options_stackedModel_'+datetime.now().strftime("%m%d-%H%M")+'.yaml'),
+        os.path.join(save_path, 'options_'+network+'_{}CV.yaml'.format(cv)),
         avoid_overwrite=True,
-        config = config,
-        save_path = save_path,
-        data_path = data_path,
+        config=config,
+        save_path=save_path,
+        data_path=data_path,
     )
+    print("Data Path: {}".format(data_path))
+    print("Save Path: {}".format(save_path))
 
     base_learning_rate = 0.00001
-    decay = base_learning_rate / max_steps
-    reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.2,
-                              patience=5, min_lr=base_learning_rate)
-    early_stopping = tf.keras.callbacks.EarlyStopping(
-                    monitor='val_loss',
-                    patience=20,
-                    mode='min',
-                    restore_best_weights=True)
-    def lr_time_based_decay(epoch, lr):
-        return lr * 1 / (1+decay*epoch)
-    
     METRICS = [
       keras.metrics.TruePositives(name='tp'),
       keras.metrics.FalsePositives(name='fp'),
@@ -87,33 +78,38 @@ def train_stacked(
     elif method=='MRI':
         letter='m'
     fold_acc = []
-    for i in range(N_FOLDS):
-        send_path = folds_path+str(i)+'.yaml'
+    for i in range(cv):
+        send_path = os.path.join(data_path,'{}CV'.format(cv),folds_string.format(i))
         modals = [modal for modal in modalities if modal.endswith(letter)]
-        train_ds = dataset.train_ds(send_path, modals, **config['data_options']['train'])
-        test_ds = dataset.predict_ds(send_path, modals, **config['data_options']['test'])
+        trainDS = dataset.train_ds(send_path, modals, **config['data_options']['train'])
+        testDS = dataset.predict_ds(send_path, modals, **config['data_options']['test'])
         
         cvFold = str(i)
-        weights_filename = os.path.join(save_models_here+cvFold,level_0,method,'weights/')
-        preds_filename = os.path.join(save_models_here+cvFold,level_0,method,'predictions/')
-        testdata_filename = os.path.join(save_models_here+cvFold,level_0,method,'testdata/')
+        save_models_here = os.path.join(save_path,'{}CV'.format(cv))        
+        weights_filename = os.path.join(save_models_here,'Fold'+cvFold,level_0,method,'weights/')
+        preds_filename = os.path.join(save_models_here,'Fold'+cvFold,level_0,method,'predictions/')
+        testdata_filename = os.path.join(save_models_here,'Fold'+cvFold,level_0,method,'testdata/')
         os.makedirs(weights_filename, exist_ok=True)
         os.makedirs(preds_filename, exist_ok=True)
         os.makedirs(testdata_filename, exist_ok=True)
         tf.keras.backend.clear_session()
-        num_neurons = 2
-        n_trainsteps = folders.count_samples(modalities,data_path,'train')['total']//batch_size
+
+        n_trainsteps = folders.count_total(send_path,'train')//batch_size
         if level_0 == 'cnn':
-            model = vanillacnn.CNN(classifier_activation='softmax',num_classes=num_neurons)
+            model = vanillacnn.CNN()
+        elif level_0 == 'linearcombicnn':
+            model = vanillacnn.linearCombiCNN()
+        elif level_0 == 'oldcnn':
+            model = vanillacnn.oldCNN()
         elif level_0 == 'vgg16':
-            model = transfer_models.vgg16_net(classifier_activation='softmax',classifier_neurons=num_neurons)
+            model = transfer_models.vgg16_net()
         model.compile(
             optimizer=tf.keras.optimizers.Adam(learning_rate=base_learning_rate),
             loss=tf.keras.losses.CategoricalCrossentropy(),
             metrics=METRICS,
         )
         results = model.fit(
-            train_ds,
+            trainDS,
             batch_size = batch_size,
             steps_per_epoch=n_trainsteps,
             epochs=max_steps,
@@ -122,36 +118,74 @@ def train_stacked(
         )
         model.save_weights(weights_filename)
         
-
         x_test_numpy = []
         y_test_numpy = []
-        for iter in test_ds.as_numpy_iterator():
+        for iter in testDS.as_numpy_iterator():
             x_test_numpy.append(iter[0])
             y_test_numpy.append(iter[1])
 
-        # x_test = np.concatenate([x_test_numpy[0],x_test_numpy[1]])
-        # y_test = np.concatenate([y_test_numpy[0],y_test_numpy[1]])
-        x_test = x_test_numpy[0]
-        y_test = y_test_numpy[0]
-
-        #print(x_test_numpy, y_test_numpy)
-        #print(len(x_test_numpy), len(y_test_numpy))
-        print(len(x_test), len(y_test))
+        x_test = np.array(x_test_numpy)
+        y_test = np.array(y_test_numpy)
         np.save(testdata_filename+'X.npy',x_test)            
         np.save(testdata_filename+'y.npy',y_test)
-        numpy_ypred = model.predict(x_test)
-        np.save(preds_filename+'yhat.npy',numpy_ypred)
-        loss, tp, fp, tn, fn, acc, precision, recall, AUC, prc = model.evaluate(test_ds)
+
+        y_pred = np.array(model.predict(testDS))
+        np.save(preds_filename+'yhat.npy',y_pred)
         print('Saved into: %s'%weights_filename)
-        print("test loss, test acc: ",loss, acc)           
+        
+        
+        tp, fp, tn, fn = metrics.perf_measure(y_test.argmax(axis=-1),y_pred.argmax(axis=-1))
+        acc = (tp+tn) / (tp+fp+tn+fn)
+        print("test acc: ",acc)           
         fold_acc.append(acc)
+        nf_aml,nf_cc = folders.count_fromFiles(send_path, 'test')
+        if os.path.isdir(save_path) and os.path.exists(save_path):
+            sendpath = os.path.join(save_models_here,'Fold'+cvFold)
+            os.makedirs(sendpath, exist_ok=True)
+        colnames = ['Network','Modalities','Fold#','#AML(no)','#CCRCC(yes)','AUC','TP','FP','TN','FN','recall','specificity','f2','accuracy','avg_acc']
+        
+        eval_metrics = {k:0 for k in colnames}
+        roundoff = 3
+        eval_metrics['Network'] = network
+        eval_metrics['Modalities'] = ' '.join(modalities)
+        eval_metrics['Fold#'] = i
+        eval_metrics['#AML(no)'] = nf_aml
+        eval_metrics['#CCRCC(yes)'] = nf_cc
+        eval_metrics['TP'] = tp
+        eval_metrics['FP'] = fp
+        eval_metrics['TN'] = tn
+        eval_metrics['FN'] = fn
+        eval_metrics['accuracy'] = np.round_(acc,roundoff)
+        eval_metrics['AUC'] = metrics.plot_roc(y_test.argmax(axis=-1),y_pred.argmax(axis=-1), sendpath)
+        metrics.plot_loss_acc(results, sendpath, network=network)
+        f2 = metrics.plot_confmat(tp, fp, tn, fn, sendpath, roundoff)
+        eval_metrics['f2'] = np.round_(f2,roundoff)
+        eval_metrics['recall'] = np.round_((tp/(tp+fn)),roundoff)
+        eval_metrics['specificity'] = np.round_((tn/(tn+fp)),roundoff)
+        if i == cv - 1:
+            eval_metrics['avg_acc'] = np.array(fold_acc).mean()
+        else:
+            eval_metrics['avg_acc'] = 0.0
+        print(eval_metrics)
+
+        metrics_path = os.path.join(save_path,'metrics_'+metrics_file_name+'.csv')
+        if not os.path.exists(metrics_path):
+            df = pd.DataFrame(columns=colnames)
+            df = df.append(eval_metrics,ignore_index=True)
+            #df.set_index('Network', inplace=True)
+            df.to_csv(metrics_path)
+        else:
+            extra = pd.DataFrame([eval_metrics])
+            extra.to_csv(metrics_path, mode='a', header=False)
+        print("{} ***********************************RUN DONE FOLD***********************************".format(i))
         del model
         del results
+    
     avg_acc = np.array(fold_acc).mean()
     print("$$$$$$$$$$$$$$$$$$$$$$$$$")
     print("AVG ACC: {}".format(avg_acc))
     print("$$$$$$$$$$$$$$$$$$$$$$$$$")
-    return  
+    return
 
 def meta_learner(whichos, config, max_steps, level0, level1):
     '''
@@ -163,8 +197,11 @@ def meta_learner(whichos, config, max_steps, level0, level1):
         level0 (str) : network at level0 (cnn|vgg16)
         level1 (str) : network at level1 (fc|xgb)
         '''
+    
+    config = load.load_config(config)
+    cv = int(config['data_options']['cv'])
     fold_metrics = []
-    for fold in range(N_FOLDS):
+    for fold in range(cv):
         acc = foldwise_meta_learner(fold, whichos, config, max_steps, level0, level1)
         fold_metrics.append(acc)
         print("Fold: {}, Accuracy: {}".format(fold, acc))
@@ -185,7 +222,6 @@ def foldwise_meta_learner(
     
     #current_fold = 0
     base_learning_rate = 0.01
-    config = load.load_config(config)
     methods = ['CT', 'MRI']
     #print("Operating System: {}".format(whichos))
     #print("Methods: {}".format(methods))
@@ -290,121 +326,3 @@ def load_models(save_models_here, level0_network, lr):
         both_models.append(model)
 
     return both_models
-
-# for i in range(N_FOLDS):
-#         send_path = folds_path+str(i)+'.yaml'
-#         #CT data loading
-#         ct_modalities = [modal for modal in modalities if modal.endswith('c')]
-#         ct_train_ds = dataset.train_ds(send_path, ct_modalities, **config['data_options']['train'])
-#         ct_test_ds = dataset.predict_ds(send_path, ct_modalities, **config['data_options']['test'])
-#         #MRI data loading
-#         mri_modalities = [modal for modal in modalities if modal.endswith('m')]
-#         mri_train_ds = dataset.train_ds(send_path, mri_modalities, **config['data_options']['train'])
-#         mri_test_ds = dataset.predict_ds(send_path, mri_modalities, **config['data_options']['test'])
-        
-#         if level_0=='cnn':
-#             #CT training
-#             method = 'CT'
-#             cvFold = str(i)
-#             weights_filename = os.path.join(save_models_here+cvFold,method,'weights/')
-#             preds_filename = os.path.join(save_models_here+cvFold,method,'predictions/')
-#             testdata_filename = os.path.join(save_models_here+cvFold,method,'testdata/')
-#             os.makedirs(weights_filename, exist_ok=True)
-#             os.makedirs(preds_filename, exist_ok=True)
-#             os.makedirs(testdata_filename, exist_ok=True)
-#             tf.keras.backend.clear_session()
-#             num_neurons = 2
-#             n_trainsteps = folders.count_samples(ct_modalities,data_path,'train')['total']//batch_size
-#             model = vanillacnn.CNN(classifier_activation='softmax',num_classes=num_neurons)
-#             model.compile(
-#                 optimizer=tf.keras.optimizers.Adam(learning_rate=base_learning_rate),
-#                 loss=tf.keras.losses.CategoricalCrossentropy(),
-#                 metrics=METRICS,
-#             )
-#             results = model.fit(
-#                 ct_train_ds,
-#                 batch_size = batch_size,
-#                 steps_per_epoch=n_trainsteps,
-#                 epochs=max_steps,
-#                 callbacks = [TqdmCallback(verbose=2)],
-#                 verbose=0,
-#             )
-#             model.save_weights(weights_filename)
-#             print('Saved into: %s'%weights_filename)
-#             print("test loss, test acc: ",model.evaluate(ct_test_ds))           
-
-#             x_test_numpy = []
-#             y_test_numpy = []
-#             for iter in ct_test_ds.as_numpy_iterator():
-#                 x_test_numpy.append(iter[0])
-#                 y_test_numpy.append(iter[1])
-
-#             x_test = np.concatenate([x_test_numpy[0],x_test_numpy[1]])
-#             y_test = np.concatenate([y_test_numpy[0],y_test_numpy[1]])
-#             np.save(testdata_filename+'X.npy',x_test)            
-#             np.save(testdata_filename+'y.npy',y_test)
-#             numpy_ypred = model.predict(x_test)
-#             np.save(preds_filename+'yhat.npy',numpy_ypred)
-            
-#             del model
-#             del results
-            
-#             #MRI training
-#             method = 'MRI'
-#             cvFold = str(i)
-#             weights_filename = os.path.join(save_models_here+cvFold,method,'weights/')
-#             preds_filename = os.path.join(save_models_here+cvFold,method,'predictions/')
-#             testdata_filename = os.path.join(save_models_here+cvFold,method,'testdata/')
-#             os.makedirs(weights_filename, exist_ok=True)
-#             os.makedirs(preds_filename, exist_ok=True)
-#             os.makedirs(testdata_filename, exist_ok=True)
-#             tf.keras.backend.clear_session()
-#             num_neurons = 2
-#             n_trainsteps = folders.count_samples(mri_modalities,data_path,'train')['total']//batch_size
-#             model = vanillacnn.CNN(classifier_activation='softmax',num_classes=num_neurons)
-#             model.compile(
-#                 optimizer=tf.keras.optimizers.Adam(learning_rate=base_learning_rate),
-#                 loss=tf.keras.losses.CategoricalCrossentropy(),
-#                 metrics=METRICS,
-#             )
-#             results = model.fit(
-#                 mri_train_ds,
-#                 batch_size = batch_size,
-#                 steps_per_epoch=n_trainsteps,
-#                 epochs=max_steps,
-#                 callbacks = [TqdmCallback(verbose=2)],
-#                 verbose=0,
-#             )
-#             model.save_weights(weights_filename)
-#             print('Saved into: %s'%weights_filename)
-#             print("test loss, test acc: ",model.evaluate(mri_test_ds))           
-
-#             x_test_numpy = []
-#             y_test_numpy = []
-#             for iter in mri_test_ds.as_numpy_iterator():
-#                 x_test_numpy.append(iter[0])
-#                 y_test_numpy.append(iter[1])
-
-#             x_test = np.concatenate([x_test_numpy[0],x_test_numpy[1]])
-#             y_test = np.concatenate([y_test_numpy[0],y_test_numpy[1]])
-#             np.save(testdata_filename+'X.npy',x_test)            
-#             np.save(testdata_filename+'y.npy',y_test)
-#             numpy_ypred = model.predict(x_test)
-#             np.save(preds_filename+'yhat.npy',numpy_ypred)
-            
-#             del model
-#             del results
-
-
-
-# tf.keras.backend.clear_session()
-# new_model = vanillacnn.CNN(classifier_activation='softmax',num_classes=2)
-# new_model.compile(
-#     optimizer=tf.keras.optimizers.Adam(learning_rate=base_learning_rate),
-#     loss=tf.keras.losses.CategoricalCrossentropy(),
-#     metrics=['categorical_accuracy'],
-# )
-# new_model.fit(ct_test_ds, batch_size=1, epochs=1)
-# new_model.load_weights(filename)
-# acc = new_model.evaluate(ct_test_ds, verbose=2)
-# print("Restored model, accuracy:",acc)

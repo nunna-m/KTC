@@ -4,20 +4,15 @@ interface for training models
 
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-from datetime import datetime
 import tensorflow as tf
 from tensorflow import keras
-from matplotlib import pyplot as plt
-from sklearn.metrics import auc, roc_curve
 from tqdm.keras import TqdmCallback
 import pandas as pd
 import numpy as np
-from ktc.utils import load, dump
+from ktc.utils import load, dump, metrics
 from ktc import dataset, folders
 from ktc.models.tf_models import transfer_models, vanillacnn
 
-logsdir = "logs/fit/transfer_learning/" + datetime.now().strftime("%m%d-%H%M")
-tensorboard_callback = keras.callbacks.TensorBoard(log_dir=logsdir)
 folds_string = 'allSubjectPaths{}.yaml'
 def train(
     whichos,
@@ -26,6 +21,7 @@ def train(
     network,
     config,
     max_steps,
+    filename=None,
 ):
     '''
     Train a model with specified configs.
@@ -35,10 +31,11 @@ def train(
         whichos: operation system linux/windows/remote
         modalities (list[str]): the modalites being used
         max_steps (int): max training steps
-        method: CT or MRI or both
+        method: CT or MRI or both (indicating used only ct modalities, or only mri modalities or use a combination of both)
         network: which network to use
         config (list[str]): config file paths (one or more) first one will be the main config and others will overwrite the main one or add to it
         max_steps (int): maximum training epochs
+        filename: desired metrics filename, default is numAug_network_numberofepochs
     '''
     config = load.load_config(config)
     modalities = sorted(modalities, reverse=False)
@@ -47,11 +44,15 @@ def train(
     print("Method: %s"%method)
     #network = str(network[0])
 
-    metrics_file_name = config['data_options']['metrics_file_name']
+    
     save_path = os.path.join(config['data_options'][whichos]['save_path'],metrics_file_name,'_'.join(modalities))
     data_path = os.path.join(config['data_options'][whichos]['data_path'],'_'.join(modalities))
     cv = int(config['data_options']['cv'])
     batch_size = config['data_options']['train']['batch_size']
+    if not filename:
+        metrics_file_name = '{}Aug_{}_{}eps'.format(len(config['data_options']['train']['aug_configs']),network,max_steps)
+    else:
+        metrics_file_name = filename
     dump.dump_options(
         os.path.join(save_path, 'options_'+network+'_{}CV.yaml'.format(cv)),
         avoid_overwrite=True,
@@ -62,18 +63,7 @@ def train(
     print("Data Path: {}".format(data_path))
     print("Save Path: {}".format(save_path))
 
-    base_learning_rate = 0.00001
-    # decay = base_learning_rate / max_steps
-    # reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.2,
-    #                           patience=5, min_lr=base_learning_rate)
-    # early_stopping = tf.keras.callbacks.EarlyStopping(
-    #                 monitor='val_loss',
-    #                 patience=20,
-    #                 mode='min',
-    #                 restore_best_weights=True)
-    # def lr_time_based_decay(epoch, lr):
-    #     return lr * 1 / (1+decay*epoch)
-    
+    base_learning_rate = 0.00001    
     METRICS = [
       keras.metrics.TruePositives(name='tp'),
       keras.metrics.FalsePositives(name='fp'),
@@ -143,7 +133,7 @@ def train(
         print('Saved into: %s'%weights_filename)
         
         
-        tp, fp, tn, fn = perf_measure(y_test.argmax(axis=-1),y_pred.argmax(axis=-1))
+        tp, fp, tn, fn = metrics.perf_measure(y_test.argmax(axis=-1),y_pred.argmax(axis=-1))
         acc = (tp+tn) / (tp+fp+tn+fn)
         print("test acc: ",acc)           
         fold_acc.append(acc)
@@ -165,9 +155,9 @@ def train(
         eval_metrics['TN'] = tn
         eval_metrics['FN'] = fn
         eval_metrics['accuracy'] = np.round_(acc,roundoff)
-        eval_metrics['AUC'] = plot_roc(y_test.argmax(axis=-1),y_pred.argmax(axis=-1), sendpath)
-        plot_loss_acc(results, sendpath, network=network)
-        f2 = plot_confmat(tp, fp, tn, fn, sendpath, roundoff)
+        eval_metrics['AUC'] = metrics.plot_roc(y_test.argmax(axis=-1),y_pred.argmax(axis=-1), sendpath)
+        metrics.plot_loss_acc(results, sendpath, network=network)
+        f2 = metrics.plot_confmat(tp, fp, tn, fn, sendpath, roundoff)
         eval_metrics['f2'] = np.round_(f2,roundoff)
         eval_metrics['recall'] = np.round_((tp/(tp+fn)),roundoff)
         eval_metrics['specificity'] = np.round_((tn/(tn+fp)),roundoff)
@@ -194,132 +184,7 @@ def train(
     print("$$$$$$$$$$$$$$$$$$$$$$$$$")
     print("AVG ACC: {}".format(avg_acc))
     print("$$$$$$$$$$$$$$$$$$$$$$$$$")
-    
-    
     return
     
-def perf_measure(y_actual, y_hat):
-    '''
-    Calculate True positives, False Positives, True Negatives and False Negatives from predicted labels and actual labels
-    Returns tuple of (TP, FP, TN, FN)
-    Args:
-        y_actual: actual labels (0 or 1 benign/cancerous)
-        y_hat: predicted labels (0 or 1, major class is taken based on bigger number after softmax activation)
-    '''
-    TP = 0
-    FP = 0
-    TN = 0
-    FN = 0
-    #print("y_actual: ",y_actual, len(y_actual))
-    #print("y_hat: ",y_hat, len(y_hat))
-    for i in range(len(y_hat)): 
-        if y_actual[i]==y_hat[i]==1:
-           TP += 1
-        if y_hat[i]==1 and y_actual[i]!=y_hat[i]:
-           FP += 1
-        if y_actual[i]==y_hat[i]==0:
-           TN += 1
-        if y_hat[i]==0 and y_actual[i]!=y_hat[i]:
-           FN += 1
 
-    return(TP, FP, TN, FN)
-
-def plot_roc(y_true, y_pred, path):
-    '''
-    plots roc curve and returns auc
-    Args:
-        y_true: actual labels
-        y_pred: predicted labels
-        path: path to store the roc curve image
-    '''
-    fpr, tpr, _ = roc_curve(y_true, y_pred)
-    fig = plt.figure()
-    plt.plot(fpr, tpr)
-    plt.xlim([0.0, 1.0])
-    plt.ylim([0.0, 1.05])
-    plt.xlabel('False Positive Rate')
-    plt.ylabel('True Positive Rate')
-    plt.title('Receiver operating characteristic')
-    plt.savefig(os.path.join(path,'roc.png'))
-    plt.close(fig)
-    return auc(fpr, tpr)
-
-def Find_Optimal_Cutoff(target, predicted):
-    '''
-    Find the optimal probability cutoff point for a classification model related to event rate
-    Can be used to find youden's index (currently not being used in this)
-    Args:
-        target : Matrix with dependent or target data, where rows are observations
-        predicted : Matrix with predicted data, where rows are observations
-    Returns:
-        list type, with optimal cutoff value
-    '''
-    fpr, tpr, threshold = roc_curve(target, predicted)
-    i = np.arange(len(tpr)) 
-    roc = pd.DataFrame({'tf' : pd.Series(tpr-(1-fpr), index=i), 'threshold' : pd.Series(threshold, index=i)})
-    roc_t = roc.iloc[(roc.tf-0).abs().argsort()[:1]]
-
-    return list(roc_t['threshold']) 
-
-def fbeta(tp, fp, tn, fn, beta=2.0):
-    '''return fbeta score based on tp, fp, tn, fn'''
-    squared = pow(beta, 2)
-    numerator = (1 + squared)*tp
-    denominator = ((1 + squared)*tp) + squared*fn + fp
-    return numerator/denominator
-
-def plot_confmat(tp, fp, tn, fn, path, roundoff, beta=2.0):
-    '''plot the confusion matrix and store the plot in path'''
-    f2 = fbeta(tp, fp, tn, fn, beta)
-    print('f2-score: ',f2)
-    cf = np.array([[tp,fn],
-            [fp, tn]])
-    print(cf)
-
-    classes = ['CCRCC','AML']
-    title = "Confusion Matrix"
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    cax = ax.matshow(cf)
-    plt.title('Confusion matrix of the classifier')
-    fig.colorbar(cax)
-    ax.set_xticks([0,0,1])
-    ax.set_yticks([0,0,1])
-    ax.set_xticklabels([''] + classes)
-    ax.set_yticklabels([''] + classes)
-    plt.xlabel('Predicted')
-    plt.ylabel('Actual')
-    plt.title(title)
-    plt.savefig(os.path.join(path,'cf.png'))
-    plt.close(fig)
-
-    return f2
-
-def plot_loss_acc(history, path, network):
-    '''plot loss and accuracy curves (for now only training metrics are plotted because no validation data'''
-    req = history.history
-    
-    #plot training and val loss
-    metric = 'loss'
-    fig = plt.figure()
-    plt.plot(req[metric])
-    #plt.plot(req['val_'+metric])
-    plt.title(network+' fine tuning model '+metric)
-    plt.xlabel('epoch')
-    #plt.legend(['train','val'], loc= 'upper left')
-    plt.legend(['train'], loc= 'upper left')
-    plt.savefig(os.path.join(path,metric+'.png'))
-    plt.close(fig)
-
-    #plot training and val accuracy
-    metric = 'accuracy'
-    fig2 = plt.figure()
-    plt.plot(req[metric])
-    #plt.plot(req['val_'+metric])
-    plt.title(network+' fine tuning model '+metric)
-    plt.xlabel('epoch')
-    #plt.legend(['train','val'], loc= 'upper left')
-    plt.legend(['train'], loc= 'upper left')
-    plt.savefig(os.path.join(path,metric+'.png'))
-    plt.close(fig2)
 

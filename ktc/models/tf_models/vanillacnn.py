@@ -157,7 +157,7 @@ class oldCNN(Model):
         trainable=True,
         activation='relu',
         classifier_activation='softmax',
-        num_classes=1,
+        num_classes=2,
         **kargs,
     ):
         super().__init__(**kargs)

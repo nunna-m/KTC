@@ -1,9 +1,11 @@
 data_options:
     split_CTMRI: True
     modalities: ['am', 'dc', 'ec', 'pc', 'tm']
+    cv: 5
+    metrics_file_name: '7AugCNN_30ep'
     network_info:
       level_0:
-        vgg16
+        cnn
       level_1:
         fc
     remote:
