@@ -30,7 +30,6 @@ def train(
     Args:
         whichos: operation system linux/windows/remote
         modalities (list[str]): the modalites being used
-        max_steps (int): max training steps
         method: CT or MRI or both (indicating used only ct modalities, or only mri modalities or use a combination of both)
         network: which network to use
         config (list[str]): config file paths (one or more) first one will be the main config and others will overwrite the main one or add to it
@@ -42,17 +41,14 @@ def train(
     print("Modalities: %s"%modalities)
     print("Operating System: {}".format(whichos))
     print("Method: %s"%method)
-    #network = str(network[0])
-
-    
-    save_path = os.path.join(config['data_options'][whichos]['save_path'],metrics_file_name,'_'.join(modalities))
-    data_path = os.path.join(config['data_options'][whichos]['data_path'],'_'.join(modalities))
-    cv = int(config['data_options']['cv'])
-    batch_size = config['data_options']['train']['batch_size']
     if not filename:
         metrics_file_name = '{}Aug_{}_{}eps'.format(len(config['data_options']['train']['aug_configs']),network,max_steps)
     else:
         metrics_file_name = filename
+    save_path = os.path.join(config['data_options'][whichos]['save_path'],metrics_file_name,'_'.join(modalities))
+    data_path = os.path.join(config['data_options'][whichos]['data_path'],'_'.join(modalities))
+    cv = int(config['data_options']['cv'])
+    batch_size = config['data_options']['train']['batch_size']
     dump.dump_options(
         os.path.join(save_path, 'options_'+network+'_{}CV.yaml'.format(cv)),
         avoid_overwrite=True,
@@ -132,6 +128,8 @@ def train(
         np.save(preds_filename+'yhat.npy',y_pred)
         print('Saved into: %s'%weights_filename)
         
+        print('y_actual: {}'.format(y_test))
+        print('y_pred: {}'.format(y_pred))
         
         tp, fp, tn, fn = metrics.perf_measure(y_test.argmax(axis=-1),y_pred.argmax(axis=-1))
         acc = (tp+tn) / (tp+fp+tn+fn)
