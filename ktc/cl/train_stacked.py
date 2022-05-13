@@ -228,23 +228,25 @@ def foldwise_meta_learner(
     
     #ytest will be same for CT or MRI (because subset of am_dc_ec_pc_tm)--loading from either one is enough
     test_data_path = os.path.join(save_models_here,level_0,methods[0],'testdata/y.npy')
-    ytest_data = np.load(test_data_path)
+    ytest = np.load(test_data_path)
     pred_data = dict()
+    ytest_data = dict()
     pred_data_counts = dict()
     for method in methods:
         pred_data_path = os.path.join(save_models_here,level_0,method,'predictions/yhat.npy')
         pred_data[method] = np.load(pred_data_path)
+        ytest_data[method] = ytest
         pred_data_counts[method] = pred_data[method].shape[0]
         #print(met, pred_data[met].shape)
     
     #make CT and MRI same shape
     if pred_data_counts['CT'] <= pred_data_counts['MRI']:
         pred_data['MRI'] = pred_data['MRI'][0:pred_data_counts['CT'],:]
-        ytest_data = ytest_data[0:pred_data_counts['CT']]
+        ytest_data['MRI'] = ytest_data['MRI'][0:pred_data_counts['CT']]
         #print('new MRI shape:', pred_data['MRI'].shape)
     elif pred_data_counts['CT'] > pred_data_counts['MRI']:
         pred_data['CT'] = pred_data['CT'][0:pred_data_counts['MRI'],:]
-        ytest_data = ytest_data[0:pred_data_counts['MRI']]
+        ytest_data['CT'] = ytest_data['CT'][0:pred_data_counts['MRI']]
         #print('new CT shape:', pred_data['CT'].shape)
     
     #print(len(pred_data['CT']), len(pred_data['MRI']))
@@ -265,29 +267,38 @@ def foldwise_meta_learner(
     print('Stacked Test Accuracy: %.3f' % acc)
     return acc
 
-def stacked_dataset(pred_data, methods):
+def stacked_dataset(pred_data, ytest, methods):
     stackX = None
 
     for method in methods:
         yhat = pred_data[method]
+        yactual = ytest[method]
         if stackX is None:
             stackX = yhat
+            stacky = yactual
         else:
             stackX = np.dstack((stackX, yhat))
+            stacky = np.stack((stacky, yactual),axis=1)
         print("method, stackX.shape=",method, stackX.shape)
-    stackX = stackX.reshape((stackX.shape[0], stackX.shape[1]*stackX.shape[2]))
+        print("method, stacky.shape=",method, stacky.shape)
+    #stackX = stackX.reshape((stackX.shape[0], stackX.shape[1]*stackX.shape[2]))
     print("Stacked shape: {}".format(stackX.shape))
-    return stackX
+    return stackX, stacky
 
 def fit_stacked_nn(pred_data, methods, ytest, max_steps, lr):
-    stackedX = stacked_dataset(pred_data, methods)
+    stackedX, stackedytest = stacked_dataset(pred_data, ytest, methods)
     model = transfer_models.stackedNet()
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=lr),
         loss=tf.keras.losses.CategoricalCrossentropy(),
         metrics=['categorical_accuracy'],
         )
-    model.fit(stackedX, ytest, epochs=max_steps)
+    print("ytest.shape=",ytest.shape)
+    print("ytest=",ytest)
+
+    print("stackedytest.shape=",stackedytest.shape)
+    print("stackedytest=",stackedytest)
+    model.fit(stackedX, stackedytest, epochs=max_steps)
     return model
 
 def fit_stacked_xgb(pred_data, methods, ytest, max_steps, lr):
