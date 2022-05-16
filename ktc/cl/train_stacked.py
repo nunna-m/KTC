@@ -227,17 +227,21 @@ def foldwise_meta_learner(
     #save_models_here = config['data_options'][whichos]['save_models_here']
     
     #ytest will be same for CT or MRI (because subset of am_dc_ec_pc_tm)--loading from either one is enough
-    ytestPath = os.path.join(save_models_here,level_0,methods[0],'testdata', 'y.npy')
+    testdataPath = os.path.join(save_models_here,level_0,methods[0],'testdata')
     Xtest = {}
+    ytest = {}
     for method in methods:
-        Xtest[method] = np.load(os.path.join(save_models_here,level_0,method,'testdata','X.npy'))
+        Xtest[method] = np.load(os.path.join(testdataPath,'X.npy'))
+        ytest[method] = np.load(os.path.join(testdataPath,'y.npy'))
     #print("Xtest[CT].shape",Xtest['CT'].shape)
     #print("Xtest[MRI].shape",Xtest['MRI'].shape)
-    ytest = np.tile(np.squeeze(np.load(ytestPath)),[len(methods),1])#duplicating the labels of CT for MRI because labels are same
+    #ytest = np.tile(np.squeeze(np.load(ytestPath)),[len(methods),1])#duplicating the labels of CT for MRI because labels are same
     
-    models = load_models(save_models_here, level_0, base_learning_rate)
-    stacked_model = transfer_models.define_stacked_model(models)
-    stacked_dataset = stackData(Xtest, methods)
+    #generate leave one out data for each method, for each class
+    
+    # models = load_models(save_models_here, level_0, base_learning_rate)
+    # stacked_model = transfer_models.define_stacked_model(models)
+    # stacked_dataset = stackData(Xtest, methods)
     return
 
 def stackData(Xtest, methods):
