@@ -239,14 +239,16 @@ class stackedNet(Model):
         return x
     
 def define_stacked_model(model_members):
-    for i in range(len(model_members)):
-        model = model_members[i]
-        for layer in model.layers:
-            layer.trainable = False
-            layer._name = 'ensemble_'+str(i+1)+'_'+layer.name
+    # i = 0
+    # for method,model in model_members.items():
+    #     for layer in model.layers:
+    #         layer.trainable = False
+    #         layer._name = 'ensemble_'+str(i+1)+'_'+layer.name
+    #     i += 1
     
-    ensemble_visible = [model.input for model in model_members]
-    ensemble_outputs = [model.output for model in model_members]
+    layerNum = -2
+    ensemble_visible = [model.input for model in model_members.values()]
+    ensemble_outputs = [model.layers[layerNum].output for model in model_members.values()]
     merge = layers.Concatenate(ensemble_outputs)
     hidden = layers.Dense(10, activation='relu')(merge)
     output = layers.Dense(2, activation='softmax')(hidden)

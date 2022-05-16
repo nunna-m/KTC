@@ -227,63 +227,28 @@ def foldwise_meta_learner(
     #save_models_here = config['data_options'][whichos]['save_models_here']
     
     #ytest will be same for CT or MRI (because subset of am_dc_ec_pc_tm)--loading from either one is enough
-    test_data_path = os.path.join(save_models_here,level_0,methods[0],'testdata/y.npy')
-    ytest = np.load(test_data_path)
-    pred_data = dict()
-    ytest_data = dict()
-    pred_data_counts = dict()
+    ytestPath = os.path.join(save_models_here,level_0,methods[0],'testdata', 'y.npy')
+    Xtest = {}
     for method in methods:
-        pred_data_path = os.path.join(save_models_here,level_0,method,'predictions/yhat.npy')
-        pred_data[method] = np.load(pred_data_path)
-        ytest_data[method] = ytest
-        pred_data_counts[method] = pred_data[method].shape[0]
-        #print(met, pred_data[met].shape)
+        Xtest[method] = np.load(os.path.join(save_models_here,level_0,method,'testdata','X.npy'))
+    #print("Xtest[CT].shape",Xtest['CT'].shape)
+    #print("Xtest[MRI].shape",Xtest['MRI'].shape)
+    ytest = np.tile(np.squeeze(np.load(ytestPath)),[len(methods),1])#duplicating the labels of CT for MRI because labels are same
     
-    #make CT and MRI same shape
-    if pred_data_counts['CT'] <= pred_data_counts['MRI']:
-        pred_data['MRI'] = pred_data['MRI'][0:pred_data_counts['CT'],:]
-        ytest_data['MRI'] = ytest_data['MRI'][0:pred_data_counts['CT']]
-        #print('new MRI shape:', pred_data['MRI'].shape)
-    elif pred_data_counts['CT'] > pred_data_counts['MRI']:
-        pred_data['CT'] = pred_data['CT'][0:pred_data_counts['MRI'],:]
-        ytest_data['CT'] = ytest_data['CT'][0:pred_data_counts['MRI']]
-        #print('new CT shape:', pred_data['CT'].shape)
-    
-    #print(len(pred_data['CT']), len(pred_data['MRI']))
-    if level_1 == 'fc':
-        model = fit_stacked_nn(pred_data=pred_data, methods=methods, ytest=ytest_data, max_steps=max_steps, lr=base_learning_rate)
-    elif level_1 == 'xgb':
-        model = fit_stacked_xgb(pred_data=pred_data, methods=methods, ytest=ytest_data, max_steps=max_steps, lr=base_learning_rate)
-    yhat = stacked_prediction(pred_data=pred_data, methods=methods, model=model)
+    models = load_models(save_models_here, level_0, base_learning_rate)
+    stacked_model = transfer_models.define_stacked_model(models)
+    stacked_dataset = stackData(Xtest, methods)
+    return
 
-    #print("Ytest data: {}".format(ytest_data))
-    #print("Yhat data: {}".format(yhat))
-    sv_ytest = np.argmax(ytest_data, axis=1)
-    if level_1=='xgb':
-        sv_yhat = yhat
-    else:
-        sv_yhat = np.argmax(yhat, axis=1)
-    acc = accuracy_score(sv_ytest, sv_yhat)
-    print('Stacked Test Accuracy: %.3f' % acc)
-    return acc
+def stackData(Xtest, methods):
+    res = []
+    assert (Xtest['CT'].shape[0] >= Xtest['MRI'].shape[0])
+    res.append(Xtest['CT'][:Xtest['MRI'].shape[0],:,:,:])
+    res.append(Xtest['MRI'])
 
-def stacked_dataset(pred_data, ytest, methods):
-    stackX = None
-
-    for method in methods:
-        yhat = pred_data[method]
-        yactual = ytest[method]
-        if stackX is None:
-            stackX = yhat
-            stacky = yactual
-        else:
-            stackX = np.dstack((stackX, yhat))
-            stacky = np.stack((stacky, yactual),axis=1)
-        print("method, stackX.shape=",method, stackX.shape)
-        print("method, stacky.shape=",method, stacky.shape)
-    #stackX = stackX.reshape((stackX.shape[0], stackX.shape[1]*stackX.shape[2]))
-    print("Stacked shape: {}".format(stackX.shape))
-    return stackX, stacky
+    res = np.array(res)
+    print(res.shape)
+    return res
 
 def fit_stacked_nn(pred_data, methods, ytest, max_steps, lr):
     stackedX, stackedytest = stacked_dataset(pred_data, ytest, methods)
@@ -316,10 +281,9 @@ def stacked_prediction(pred_data, methods, model):
 
 def load_models(save_models_here, level0_network, lr):
     base_learning_rate = lr
-    both_models = []
-    met = ['CT','MRI']
-    f = 0
-    for i in range(len(met)):
+    both_models = {}
+    methods = ['CT','MRI']
+    for method in methods:
         if level0_network == 'cnn':
             model = vanillacnn.CNN(classifier_activation='softmax',num_classes=2)
         elif level0_network == 'vgg16':
@@ -329,8 +293,8 @@ def load_models(save_models_here, level0_network, lr):
         loss=tf.keras.losses.CategoricalCrossentropy(),
         metrics=['categorical_accuracy'],
         )
-        model_path = os.path.join(save_models_here+str(f),level0_network,met[i],'weights/')
+        model_path = os.path.join(save_models_here,level0_network,method,'weights/')
         model.load_weights(model_path)
-        both_models.append(model)
+        both_models[method] = model
 
     return both_models
