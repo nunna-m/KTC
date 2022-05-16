@@ -1,1 +1,1 @@
-python3 -m ktc train --whichos remote --modalities am dc ec pc tm --method both --network cnn --config "configfiles/extra/data_options.yaml" --max_steps 30
+python3 -m ktc train --whichos remote --modalities am dc ec pc tm --method both --network cnn --config "configfiles/extra/data_options.yaml" --max_steps 50 --filename mpCNN_5ch_14Aug_50ep_exactTumor
