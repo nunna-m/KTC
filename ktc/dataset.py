@@ -375,13 +375,17 @@ def parse_subject(subject_path,
     if tumor_region_only:
         for modality, names in gathered_modalities_paths.items():
             subject_data[modality] = {
-                os.path.splitext(name)[0]: get_tumor_boundingbox(os.path.join(subject_path, modality, name),os.path.join(subject_path, modality+'L', name)) for name in names
+                os.path.splitext(name)[0]: get_exact_tumor(os.path.join(subject_path, modality, name),os.path.join(subject_path, modality+'L', name)) for name in names
             } 
     else:
         for modality, names in gathered_modalities_paths.items():
             subject_data[modality] = {
-                os.path.splitext(name)[0]: resize(decoder(os.path.join(subject_path, modality, name))[:, :, 0], output_size)for name in names
+                os.path.splitext(name)[0]: get_tumor_boundingbox(os.path.join(subject_path, modality, name),os.path.join(subject_path, modality+'L', name)) for name in names
             }
+        # for modality, names in gathered_modalities_paths.items():
+        #     subject_data[modality] = {
+        #         os.path.splitext(name)[0]: resize(decoder(os.path.join(subject_path, modality, name))[:, :, 0], output_size)for name in names
+        #     }
     return subject_data
 
 def get_class_ID_subjectpath(subject):
@@ -415,6 +419,32 @@ def crop(img, resize_shape, crop_dict):
     img = tf.convert_to_tensor(img, dtype=tf.uint8)
     return img
 
+def get_exact_tumor(imgpath, labelpath):
+    '''
+    get the exact segmented tumor region (pixel perfect) based on label already provided
+    '''
+    orig_image = cv2.imread(imgpath)[:,:,0]
+    (orig_height, orig_width) = cv2.imread(imgpath)[:,:,0].shape
+    image = cv2.imread(labelpath)
+    image = cv2.resize(image, (orig_width, orig_height))
+    backup = image.copy()
+    lower_red = np.array([0,0,50])
+    upper_red = np.array([0,0,255])
+    mask = cv2.inRange(image, lower_red, upper_red)
+    #cv2.imwrite('/home/maanvi/Desktop/mask.png',mask)
+    ret, thresh1 = cv2.threshold(mask, 0, 255, cv2.THRESH_BINARY)
+    orig_image[thresh1==0] = 0
+    out = np.zeros_like(orig_image)
+    out[mask == 255] = orig_image[mask == 255]
+    #crop out
+    (y, x) = np.where(mask == 255)
+    (topy, topx) = (np.min(y), np.min(x))
+    (bottomy, bottomx) = (np.max(y), np.max(x))
+    out = out[topy:bottomy+1, topx:bottomx+1]
+    out = cv2.resize(out, (224,224), interpolation=cv2.INTER_CUBIC)
+    out = tf.convert_to_tensor(out, dtype=tf.uint8)
+    #cv2.imwrite('/home/maanvi/Desktop/segmented.png',out)
+    return out
 def get_tumor_boundingbox(imgpath, labelpath):
     '''
     get the bounding box coordinates around tumor
