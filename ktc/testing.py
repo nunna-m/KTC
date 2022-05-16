@@ -12,13 +12,13 @@ import matplotlib.pyplot as plt
 modality = 'dc_ec_pc'
 num_mods = 3
 folds = 10
-datapath = '/home/maanvi/LAB/Datasets/kt_new_trainvaltest/fold1/dc_ec_pc/10CV/allSubjectPaths0.yaml'
-train_subjects, test_subjects = [], []
-with open(datapath,'r') as file:
-    data = yaml.safe_load(file)
-train_subjects.extend(data['train'])
-test_subjects.extend(data['test'])
-mapping = {'AML': 0, 'CCRCC':1}
+# datapath = '/home/maanvi/LAB/Datasets/kt_new_trainvaltest/fold1/dc_ec_pc/10CV/allSubjectPaths0.yaml'
+# train_subjects, test_subjects = [], []
+# with open(datapath,'r') as file:
+#     data = yaml.safe_load(file)
+# train_subjects.extend(data['train'])
+# test_subjects.extend(data['test'])
+# mapping = {'AML': 0, 'CCRCC':1}
 
 def read_img(path, file):
     imgpath = os.path.join(path, file)
@@ -31,6 +31,22 @@ def read_img(path, file):
     lower_red = np.array([0,0,50])
     upper_red = np.array([0,0,255])
     mask = cv2.inRange(image, lower_red, upper_red)
+
+    #crop out exact tumor ROI to the pixel and resize to standard size
+    cv2.imwrite('/home/maanvi/Desktop/mask.png',mask)
+    ret, thresh1 = cv2.threshold(mask, 0, 255, cv2.THRESH_BINARY)
+    orig_image[thresh1==0] = 0
+    out = np.zeros_like(orig_image)
+    out[mask == 255] = orig_image[mask == 255]
+    #crop out
+    (y, x) = np.where(mask == 255)
+    (topy, topx) = (np.min(y), np.min(x))
+    (bottomy, bottomx) = (np.max(y), np.max(x))
+    out = out[topy:bottomy+1, topx:bottomx+1]
+    out = cv2.resize(out, (224,224), interpolation=cv2.INTER_CUBIC)
+    cv2.imwrite('/home/maanvi/Desktop/segmented.png',out)
+
+
     contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2. CHAIN_APPROX_NONE)
     c = max(contours, key=cv2.contourArea)
     x, y, w, h = cv2.boundingRect(c)
@@ -99,15 +115,15 @@ def gen_data_from_paths(subject_paths):
         rety.extend([y]*len(filenames))
     return np.vstack(retX), np.vstack(rety)
 
-X_train, y_train = gen_data_from_paths(train_subjects)
-X_test, y_test = gen_data_from_paths(test_subjects)
-print(X_train.shape, y_train.shape)
+#X_train, y_train = gen_data_from_paths(train_subjects)
+#X_test, y_test = gen_data_from_paths(test_subjects)
+#print(X_train.shape, y_train.shape)
 
 # (X_train, y_train), (X_test, y_test) = tf.keras.datasets.cifar10.load_data()
 # print(X_train.shape, y_train.shape)
 
 #plotting data
-dataset = tf.data.Dataset.from_tensor_slices((X_train[0:2]/255.0).astype(np.float32))
+#dataset = tf.data.Dataset.from_tensor_slices((X_train[0:2]/255.0).astype(np.float32))
 
 def plot_images(dataset, n_images, samples_per_image):
     output = np.zeros((8 * n_images, 8 * samples_per_image, num_mods))
@@ -120,4 +136,6 @@ def plot_images(dataset, n_images, samples_per_image):
     plt.imshow(output)
     plt.show()
 
-plot_images(dataset, n_images=2, samples_per_image=4)
+#plot_images(dataset, n_images=2, samples_per_image=4)
+
+read_img('/home/maanvi/LAB/Datasets/kt_new_trainvaltest/ec_pc_tm/train/AML/16313384/tm','2.png')
