@@ -25,12 +25,14 @@ def plot_image_grid(images, ncols=None, cmap='gray'):
             ax.axis('off')
             ax.imshow(img, cmap=cmap)
     plt.show()
-base_path = '/home/maanvi/LAB/Datasets'
+#base_path = '/home/maanvi/LAB/Datasets'
+base_path = r'D:\01_Maanvi\LABB\datasets'
 phase = 'dc'
-path = os.path.join(base_path,'kt_new_trainvaltest',phase,'5CV/allSubjectPaths0.yaml')
+#path = os.path.join(base_path,'kt_new_trainvaltest',phase,'5CV/allSubjectPaths0.yaml')
+path = os.path.join(base_path,'kt_new_trainvaltest','fold1',phase,'allSubjectPaths1.yaml')
 with open(path, 'r') as file:
     data = yaml.safe_load(file)
-    subject_path = data['train'][0]
+    subject_path = data['train'][10]
 
 print(subject_path)
 
@@ -42,22 +44,26 @@ label = 0
 output_size = (224,224)
 aug_functions = [
     dataset.flip_leftright,
-    dataset.rotate90,
-    dataset.rotate180,
-    dataset.rotate270,
-    dataset.up_rotate90,
-    dataset.up_rotate180,
-    dataset.up_rotate270,
-    dataset.random_horizontalflip,
-    dataset.random_verticalflip,
-    dataset.random_rotation,
-    dataset.random_brightness,
+    # dataset.rotate90,
+    # dataset.rotate180,
+    # dataset.rotate270,
+    # dataset.up_rotate90,
+    # dataset.up_rotate180,
+    # dataset.up_rotate270,
+    # dataset.random_horizontalflip,
+    # dataset.random_verticalflip,
+    # dataset.random_rotation,
+    # dataset.random_brightness,
 ]
 
 images = []
+add = True
 for aug in aug_functions:
     image = dataset.parse_subject(subject_path, output_size, [phase], tumor_region_only=True)[phase]['1']
     image = tf.image.convert_image_dtype(image, dtype=tf.float32)
+    if add:
+        images.append(image)
+        add = False
     image = tf.expand_dims(image, axis=-1)
     image = tf.repeat(image, repeats=[3],axis=-1)
     images.append(aug(image,label)[0])
