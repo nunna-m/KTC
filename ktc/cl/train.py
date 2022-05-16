@@ -128,8 +128,8 @@ def train(
         np.save(preds_filename+'yhat.npy',y_pred)
         print('Saved into: %s'%weights_filename)
         
-        print('y_actual: {}'.format(y_test))
-        print('y_pred: {}'.format(y_pred))
+        # print('y_actual: {}'.format(y_test))
+        # print('y_pred: {}'.format(y_pred))
         
         tp, fp, tn, fn = metrics.perf_measure(y_test.argmax(axis=-1),y_pred.argmax(axis=-1))
         acc = (tp+tn) / (tp+fp+tn+fn)
