@@ -139,11 +139,18 @@ def train(
         if os.path.isdir(save_path) and os.path.exists(save_path):
             sendpath = os.path.join(save_models_here,'Fold'+cvFold)
             os.makedirs(sendpath, exist_ok=True)
-        colnames = ['Network','Modalities','Fold#','#AML(no)','#CCRCC(yes)','AUC','TP','FP','TN','FN','recall','specificity','f2','accuracy','avg_acc']
+        all_modalities = ['am','dc','ec','pc','tm']
+        colnames = ['Network','Fold#','#AML(no)','#CCRCC(yes)','AUC','TP','FP','TN','FN','recall','specificity','f2','accuracy','avg_acc']
+        colnames = colnames[:1] + all_modalities + colnames[1:]
         
         eval_metrics = {k:0 for k in colnames}
         roundoff = 3
         eval_metrics['Network'] = network
+        diff_modalites = [m for m in all_modalities if m not in modalities]
+        for m in modalities:
+            eval_metrics[m] = 1
+        for m in diff_modalites:
+            eval_metrics[m] = 0
         eval_metrics['Modalities'] = ' '.join(modalities)
         eval_metrics['Fold#'] = i
         eval_metrics['#AML(no)'] = nf_aml
@@ -175,6 +182,17 @@ def train(
             extra = pd.DataFrame([eval_metrics])
             extra.to_csv(metrics_path, mode='a', header=False)
         print("{} ***********************************RUN DONE FOLD***********************************".format(i))
+        #add to global metrics file
+        colnames.insert(0,'File')
+        eval_metrics['File'] = metrics_file_name
+        newPath = os.path.join(config['data_options'][whichos]['save_path'],'metrics.csv')
+        if not os.path.exists(newPath):
+            df = pd.DataFrame(columns=colnames)
+            df = df.append(eval_metrics,ignore_index=True)
+            df.to_csv(newPath)
+        else:
+            extra = pd.DataFrame([eval_metrics],columns=colnames)
+            extra.to_csv(newPath, mode='a', header=False)
         del model
         del results
     
