@@ -35,9 +35,10 @@ def read_img(path, file):
     #crop out exact tumor ROI to the pixel and resize to standard size
     cv2.imwrite('/home/maanvi/Desktop/mask.png',mask)
     ret, thresh1 = cv2.threshold(mask, 0, 255, cv2.THRESH_BINARY)
-    orig_image[thresh1==0] = 0
-    out = np.zeros_like(orig_image)
-    out[mask == 255] = orig_image[mask == 255]
+    copy = orig_image.copy()
+    copy[thresh1==0] = 0
+    out = np.zeros_like(copy)
+    out[mask == 255] = copy[mask == 255]
     #crop out
     (y, x) = np.where(mask == 255)
     (topy, topx) = (np.min(y), np.min(x))
@@ -84,6 +85,7 @@ def read_img(path, file):
         orig_image *= 255
     backup = orig_image[y1:y2,x1:x2]
     backup = cv2.resize(backup, (224,224),interpolation = cv2.INTER_LINEAR)
+    cv2.imwrite('/home/maanvi/Desktop/box.png',backup)
     backup = tf.convert_to_tensor(backup, dtype=tf.uint8)
     return backup
 
@@ -138,4 +140,4 @@ def plot_images(dataset, n_images, samples_per_image):
 
 #plot_images(dataset, n_images=2, samples_per_image=4)
 
-read_img('/home/maanvi/LAB/Datasets/kt_new_trainvaltest/ec_pc_tm/train/AML/16313384/tm','2.png')
+read_img('/home/maanvi/LAB/Datasets/kt_new_trainvaltest/dc/train/AML/87137931/dc','1.png')
