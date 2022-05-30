@@ -140,4 +140,4 @@ def plot_images(dataset, n_images, samples_per_image):
 
 #plot_images(dataset, n_images=2, samples_per_image=4)
 
-read_img('/home/maanvi/LAB/Datasets/kt_new_trainvaltest/dc/train/AML/87137931/dc','1.png')
+read_img('/home/maanvi/LAB/Datasets/kt_new_trainvaltest/am_dc_ec_pc_tm/train/AML/21625010/tm','1.png')
