@@ -189,7 +189,13 @@ def train_stacked(
     print("$$$$$$$$$$$$$$$$$$$$$$$$$")
     return
 
-def meta_learner(whichos, config, max_steps, level0, level1, level0_filename):
+def meta_learner(
+    whichos, 
+    config, 
+    max_steps, 
+    level0, 
+    level1, 
+    level0_filename):
     '''
     Train a model specified in level1 of config taking outputs from level0 networks already trained using train_stacked function
     Args:
@@ -205,7 +211,9 @@ def meta_learner(whichos, config, max_steps, level0, level1, level0_filename):
     cv = int(config['data_options']['cv'])
     fold_metrics = []
     for fold in range(cv):
-        acc = foldwise_meta_learner(fold, whichos, config, max_steps, level0, level1, level0_filename)
+        savePath = os.path.join(config['data_options'][whichos]['save_path'],level0_filename,f'{cv}CV',f'Fold{fold}')
+        print(savePath)
+        acc = foldwise_meta_learner(fold, savePath, level0, level1, level0_filename)
         fold_metrics.append(acc)
         print("Fold: {}, Accuracy: {}".format(fold, acc))
     
@@ -214,6 +222,61 @@ def meta_learner(whichos, config, max_steps, level0, level1, level0_filename):
     return
 
 
+def foldwise_meta_learner(
+    foldNum,
+    savePath,
+    level0,
+    level1,
+    level0_filename,
+    ):
+        #load test data
+        methods = ['CT', 'MRI']
+        Xtest, ytest = {}, {}
+        for method in methods:
+            testdatapath = os.path.join(savePath, level0, method, 'testdata')
+            Xtest[method] = np.squeeze(np.load(os.path.join(testdatapath, 'X.npy')))
+            ytest[method] = np.squeeze(np.load(os.path.join(testdatapath, 'y.npy')))
+            print(f"{method} Xtest:{Xtest[method].shape}\tytest:{ytest[method].shape}")
+        
+        #load level 0 models based on weights
+        #return dictionary {'CT':ctmodel, 'MRI':mrimodel}
+        input_shape = (None,224,224,3)
+        models = load_models(savePath, level0)
+
+        ct_model = models['CT']
+        ct_model.fit(Xtest['CT'],ytest['CT'])
+        print(models['CT'].summary())
+
+        mri_model = models['MRI']
+        mri_model.fit(Xtest['MRI'][:3],ytest['MRI'][:3])
+        print(models['MRI'].summary())
+
+
+        #todo
+        '''create numpy or whatever serial form of training and testing data. Later internal can split train into train and val if needed/ Do this for every fold. The problem with model.fit is not enough training? probably not but anyway serialize the data for the converting the codebase into pytorch'''
+        return
+
+def load_models(save_models_here, level0_network, lr=1e-3):
+    base_learning_rate = lr
+    both_models = {}
+    methods = ['CT','MRI']
+    for method in methods:
+        if level0_network == 'cnn':
+            model = vanillacnn.CNN(classifier_activation='softmax',num_classes=2)
+        elif level0_network == 'vgg16':
+            model = transfer_models.vgg16_net(classifier_activation='softmax', classifier_neurons=2)
+        model.compile(
+        optimizer=tf.keras.optimizers.Adam(learning_rate=base_learning_rate),
+        loss=tf.keras.losses.CategoricalCrossentropy(),
+        metrics=['categorical_accuracy'],
+        )
+        model_path = os.path.join(save_models_here,level0_network,method,'weights/')
+        model.load_weights(model_path)
+        both_models[method] = model
+
+    return both_models
+
+"""
 def foldwise_meta_learner(
     current_fold,
     whichos,
@@ -305,3 +368,4 @@ def load_models(save_models_here, level0_network, lr):
         both_models[method] = model
 
     return both_models
+"""
