@@ -191,7 +191,7 @@ def train_stacked(
 
 def meta_learner(whichos, config, max_steps, level0, level1, level0_filename):
     '''
-    Train a model specified in level1 of config taking outputs from level0 networks already trained used train_stacked function
+    Train a model specified in level1 of config taking outputs from level0 networks already trained using train_stacked function
     Args:
         whichos: operation system linux/windows/remote
         config (list[str]): config file paths (one or more) first one will be the main config and others will overwrite the main one or add to it
@@ -199,7 +199,7 @@ def meta_learner(whichos, config, max_steps, level0, level1, level0_filename):
         level0 (str) : network at level0 (cnn|vgg16)
         level1 (str) : network at level1 (fc|xgb)
         level0_filename (str) : folder where level0 weights are stored
-        '''
+    '''
     
     config = load.load_config(config)
     cv = int(config['data_options']['cv'])
