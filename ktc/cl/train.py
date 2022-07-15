@@ -140,7 +140,7 @@ def train(
             sendpath = os.path.join(save_models_here,'Fold'+cvFold)
             os.makedirs(sendpath, exist_ok=True)
         all_modalities = ['am','dc','ec','pc','tm']
-        colnames = ['Network','Fold#','#AML(no)','#CCRCC(yes)','AUC','TP','FP','TN','FN','recall','specificity','f2','accuracy','avg_acc']
+        colnames = ['Network','Fold#','#AML(no)','#CCRCC(yes)','AUC','TP','FP','TN','FN','recall','specificity','f2','accuracy','avg_acc','stdev']
         colnames = colnames[:1] + all_modalities + colnames[1:]
         
         eval_metrics = {k:0 for k in colnames}
@@ -168,8 +168,10 @@ def train(
         eval_metrics['specificity'] = np.round_((tn/(tn+fp)),roundoff)
         if i == cv - 1:
             eval_metrics['avg_acc'] = np.array(fold_acc).mean()
+            eval_metrics['stdev'] = np.std(np.array(fold_acc))
         else:
             eval_metrics['avg_acc'] = 0.0
+            eval_metrics['stdev'] = 0.0
         print(eval_metrics)
 
         metrics_path = os.path.join(save_path,'metrics_'+metrics_file_name+'.csv')

@@ -1,13 +1,14 @@
+'''
+interface to train stacked model
+'''
+
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-
 import tensorflow as tf
 from tensorflow import keras
 from tqdm.keras import TqdmCallback
 import pandas as pd
 import numpy as np
-from sklearn.metrics import accuracy_score
-
 from ktc.utils import load, dump, metrics
 from ktc import dataset, folders
 from ktc.models.tf_models import transfer_models, vanillacnn
@@ -31,7 +32,7 @@ def train_stacked(
         network: which network to use (for level0 networks)
         config (list[str]): config file paths (one or more) first one will be the main config and others will overwrite the main one or add to it
         max_steps (int): maximum training epochs
-        filename: desired metrics filename, default is level0_level1_numberofepsochs
+        filename: desired metrics filename, default is level0_level1_numberofepochs
         '''
     config = load.load_config(config)
     modalities = ['am', 'dc', 'ec', 'pc', 'tm']
@@ -140,7 +141,7 @@ def train_stacked(
             storepath = os.path.join(save_models_here,'Fold'+cvFold,network,method)
             os.makedirs(storepath, exist_ok=True)
         
-        colnames = ['Network','Method','Modalities','Fold#','#AML(no)','#CCRCC(yes)','AUC','TP','FP','TN','FN','recall','specificity','f2','accuracy','avg_acc']
+        colnames = ['Network','Method','Modalities','Fold#','#AML(no)','#CCRCC(yes)','AUC','TP','FP','TN','FN','recall','specificity','f2','accuracy','avg_acc','stdev']
         
         eval_metrics = {k:0 for k in colnames}
         roundoff = 3
@@ -163,8 +164,10 @@ def train_stacked(
         eval_metrics['specificity'] = np.round_((tn/(tn+fp)),roundoff)
         if i == cv - 1:
             eval_metrics['avg_acc'] = np.array(fold_acc).mean()
+            eval_metrics['stdev'] = np.std(np.array(fold_acc))
         else:
             eval_metrics['avg_acc'] = 0.0
+            eval_metrics['stdev'] = 0.0
         print(eval_metrics)
 
         metrics_path = os.path.join(save_path,'metrics_'+metrics_file_name+'.csv')
