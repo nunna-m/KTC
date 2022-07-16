@@ -855,3 +855,11 @@ def count(ds):
     for _ in ds: 
         size += 1
     return size
+
+
+# print(parse_subject(r'D:\01_Maanvi\LABB\datasets\kt_new_trainvaltest\fold1\am_dc_ec_pc_tm\test\AML\16639185', 
+#                     (224,224), 
+#                     ('am','dc','ec','pc','tm'),
+#                     tumor_region_only=True, 
+#                     decoder=tf.image.decode_image, 
+#                     resize=tf.image.resize))
