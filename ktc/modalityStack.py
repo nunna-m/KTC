@@ -1,7 +1,6 @@
-from logging import raiseExceptions
 import numpy as np
 import os
-
+'''
 subject_data = {
     'subject_path': 'D:\\01_Maanvi\\LABB\\datasets\\kt_new_trainvaltest\\fold1\\am_ec\\train\\AML\\16313384', 'clas': 'AML', \
     'ID': '16313384', 
@@ -41,3 +40,38 @@ for name in imageNames:
             image = np.dstack([image, np.array(subject_data[modality][name])])
     
     print(f"{name}.png -- shape {image.shape}")
+'''
+
+subject_path = r'D:\Ddesktop\16639185'
+modalities = ['am','dc','ec','pc','tm']
+clas = 'AML'
+gathered_modalityPaths = {
+    modality: set(
+        os.listdir(
+            os.path.join(
+                subject_path,modality
+            )
+        )
+    )
+    for modality in modalities
+}
+same_named_imageNames = set.intersection(
+    *map(
+        lambda slices:
+        set(
+            map(
+                lambda name: os.path.splitext(name)[0], slices
+            )
+        ), gathered_modalityPaths.values()
+    )
+)
+
+for temp in modalities:
+        gathered_modalityPaths[temp] = {k+'.png' for k in same_named_imageNames}
+
+for modality in modalities:
+        gathered_modalityPaths[modality] = list(
+            filter(lambda x: os.path.splitext(x)[0],
+            gathered_modalityPaths[modality])
+        )
+print(gathered_modalityPaths)
