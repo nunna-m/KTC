@@ -75,3 +75,11 @@ for modality in modalities:
             gathered_modalityPaths[modality])
         )
 print(gathered_modalityPaths)
+
+#next tasks
+#1. store three folders fullimages, centercrop, pixelCrop
+#2. borrow getTumorBoundingBox and getExactTumor functions from dataset.py
+#3. get the images and store in numpy array format and store the images as subjectID_AML_1.npy, subjectID_AML_2.npy... in subject folder store image npy along with label? or write class in filename
+#4. get the images and store in RGB image format and store the images as subjectID_1.png, subjectID_2.png... in subject folder for all modalities <= 3 (duplicate thrice, append 0s or use all 3)
+#5. another file write function to go to every subject and collect images, print out shape and check if shape is matching
+#6. store training and testing collected numpy arrays .npys for every fold
