@@ -42,7 +42,8 @@ for name in imageNames:
     print(f"{name}.png -- shape {image.shape}")
 '''
 
-subject_path = r'D:\Ddesktop\16639185'
+#subject_path = r'D:\Ddesktop\16639185'
+subject_path = '/home/maanvi/Desktop/74298266'
 modalities = ['am','dc','ec','pc','tm']
 clas = 'AML'
 gathered_modalityPaths = {
@@ -55,6 +56,7 @@ gathered_modalityPaths = {
     )
     for modality in modalities
 }
+print(gathered_modalityPaths)
 same_named_imageNames = set.intersection(
     *map(
         lambda slices:
