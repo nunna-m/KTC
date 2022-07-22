@@ -78,6 +78,16 @@ for modality in modalities:
         )
 print(gathered_modalityPaths)
 
+imageNames = list(gathered_modalityPaths[modalities[0]].keys())
+for name in imageNames:
+    image = None
+    for modality in modalities:
+        if image is None:
+            image = np.array(gathered_modalityPaths[modality][name])
+        else:
+            image = np.dstack([image, np.array(gathered_modalityPaths[modality][name])])
+    
+    print(f"{name}.png -- shape {image.shape}")
 #next tasks
 #1. store three folders fullimages, centercrop, pixelCrop
 #2. borrow getTumorBoundingBox and getExactTumor functions from dataset.py
