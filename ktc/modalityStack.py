@@ -78,16 +78,28 @@ for modality in modalities:
         )
 print(gathered_modalityPaths)
 
-imageNames = list(gathered_modalityPaths[modalities[0]].keys())
-for name in imageNames:
-    image = None
-    for modality in modalities:
-        if image is None:
-            image = np.array(gathered_modalityPaths[modality][name])
-        else:
-            image = np.dstack([image, np.array(gathered_modalityPaths[modality][name])])
+
+subject_data = {}
+cropType = 'center'
+#crop type mapping: {'centerCrop'->'center','pixelCrop'->'pixel',None->'fullImage'}
+for modality,names in gathered_modalityPaths.items():
+    subject_data[modality] = {
+        os.path.splitext(name)[0]:getImage(os.path.join(subject_path,modality,name),os.path.join(subject_path,modality+'L',name),cropType) for name in names
+    }
+
+def getImage(imagePath, labelPath, cropType=None):
+    if cropType is None:
+        #read image full and pass back
+        return
     
-    print(f"{name}.png -- shape {image.shape}")
+    if cropType == 'center':
+        #center crop and pass back
+        return
+    
+    if cropType == 'pixel':
+        #crop based on segmentation label and pass back
+        return
+
 #next tasks
 #1. store three folders fullimages, centercrop, pixelCrop
 #2. borrow getTumorBoundingBox and getExactTumor functions from dataset.py
