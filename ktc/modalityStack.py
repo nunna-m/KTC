@@ -1,5 +1,6 @@
 import numpy as np
 import os
+import cv2
 '''
 subject_data = {
     'subject_path': 'D:\\01_Maanvi\\LABB\\datasets\\kt_new_trainvaltest\\fold1\\am_ec\\train\\AML\\16313384', 'clas': 'AML', \
@@ -41,9 +42,22 @@ for name in imageNames:
     
     print(f"{name}.png -- shape {image.shape}")
 '''
+def getImage(imagePath, labelPath, cropType=None):
+    print(imagePath, labelPath)
+    if cropType is None:
+        #read image full and pass back
+        return
+    
+    if cropType == 'center':
+        #center crop and pass back
+        return
+    
+    if cropType == 'pixel':
+        #crop based on segmentation label and pass back
+        return
 
-#subject_path = r'D:\Ddesktop\16639185'
-subject_path = '/home/maanvi/Desktop/74298266'
+subject_path = r'D:\Ddesktop\17235387'
+#subject_path = '/home/maanvi/Desktop/74298266'
 modalities = ['am','dc','ec','pc','tm']
 clas = 'AML'
 gathered_modalityPaths = {
@@ -87,18 +101,7 @@ for modality,names in gathered_modalityPaths.items():
         os.path.splitext(name)[0]:getImage(os.path.join(subject_path,modality,name),os.path.join(subject_path,modality+'L',name),cropType) for name in names
     }
 
-def getImage(imagePath, labelPath, cropType=None):
-    if cropType is None:
-        #read image full and pass back
-        return
-    
-    if cropType == 'center':
-        #center crop and pass back
-        return
-    
-    if cropType == 'pixel':
-        #crop based on segmentation label and pass back
-        return
+
 
 #next tasks
 #1. store three folders fullimages, centercrop, pixelCrop

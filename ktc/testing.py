@@ -93,6 +93,8 @@ def read_img(path, file):
 def gen_data_from_paths(subject_paths):
     retX = []
     rety = []
+    #define mapping, for now it's empty
+    mapping = {}
     for path in subject_paths:
         parts = path.rsplit(os.path.sep, 4)
         mods = parts[1].split('_')
