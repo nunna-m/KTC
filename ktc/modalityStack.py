@@ -42,65 +42,162 @@ for name in imageNames:
     
     print(f"{name}.png -- shape {image.shape}")
 '''
+def get_tumor_boundingbox(imgpath, labelpath):
+    '''
+    get the bounding box coordinates around tumor
+    first calculate center of tumor based on segmentation label
+    then calculate bounding box around it after zooming out by a factor of 0.3 on both heigth and width (just to be sure of including the entire region of the tumor)
+    am modality is gaussian standardized also
+    '''
+    orig_image = cv2.imread(imgpath)[:,:,0]
+    (orig_height, orig_width) = cv2.imread(imgpath)[:,:,0].shape
+    image = cv2.imread(labelpath)
+    image = cv2.resize(image, (orig_width, orig_height))
+    backup = image.copy()
+    lower_red = np.array([0,0,50])
+    upper_red = np.array([0,0,255])
+    mask = cv2.inRange(image, lower_red, upper_red)
+    contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2. CHAIN_APPROX_NONE)
+    c = max(contours, key=cv2.contourArea)
+    x, y, w, h = cv2.boundingRect(c)
+    assert (w,h)<(224,224)
+    assert (x,y)>=(0,0)
+    const = 0.3
+    diff_x = int(const*w)
+    diff_y = int(const*h)
+    if (x-diff_x)<0:
+        x1 = 0
+    else:
+        x1 = x-diff_x
+    if (y-diff_y)<0:
+        y1 = 0
+    else:
+        y1 = y-diff_y
+    if (x+w+diff_x)>=orig_width:
+        x2 = orig_width
+    else:
+        x2 = x+diff_x+w
+    if (y+diff_y+h)>=orig_height:
+        y2 = orig_height
+    else:
+        y2 = y+diff_y+h
+
+
+    #gaussian standardize all modalities
+    mean, std = orig_image.mean(), orig_image.std()
+    orig_image = (orig_image - mean)/std
+    mean, std = orig_image.mean(), orig_image.std()
+    orig_image = np.clip(orig_image, -1.0, 1.0)
+    orig_image = (orig_image + 1.0) / 2.0
+    orig_image *= 255
+    backup = orig_image[y1:y2,x1:x2]
+    backup = cv2.resize(backup, (224,224),interpolation = cv2.INTER_CUBIC)
+    mod = imgpath.rsplit(os.path.sep,2)[1]
+    #cv2.imwrite(f'/home/maanvi/Desktop/boxCrop{mod}.png',backup)
+    return backup
+
+def get_exact_tumor(imgpath, labelpath):
+    '''
+    get the exact segmented tumor region (pixel perfect) based on label already provided
+    '''
+    orig_image = cv2.imread(imgpath)[:,:,0]
+    (orig_height, orig_width) = cv2.imread(imgpath)[:,:,0].shape
+    image = cv2.imread(labelpath)
+    image = cv2.resize(image, (orig_width, orig_height))
+    backup = image.copy()
+    #gaussian standardizes all modalities
+    mean, std = orig_image.mean(), orig_image.std()
+    orig_image = (orig_image - mean)/std
+    mean, std = orig_image.mean(), orig_image.std()
+    orig_image = np.clip(orig_image, -1.0, 1.0)
+    orig_image = (orig_image + 1.0) / 2.0
+    orig_image *= 255
+    lower_red = np.array([0,0,50])
+    upper_red = np.array([0,0,255])
+    mask = cv2.inRange(image, lower_red, upper_red)
+    #cv2.imwrite('/home/maanvi/Desktop/mask.png',mask)
+    ret, thresh1 = cv2.threshold(mask, 0, 255, cv2.THRESH_BINARY)
+    orig_image[thresh1==0] = 0
+    out = np.zeros_like(orig_image)
+    out[mask == 255] = orig_image[mask == 255]
+    #crop out
+    (y, x) = np.where(mask == 255)
+    (topy, topx) = (np.min(y), np.min(x))
+    (bottomy, bottomx) = (np.max(y), np.max(x))
+    out = out[topy:bottomy+1, topx:bottomx+1]
+    out = cv2.resize(out, (224,224), interpolation=cv2.INTER_CUBIC)
+    mod = imgpath.rsplit(os.path.sep,2)[1]
+    #cv2.imwrite(f'/home/maanvi/Desktop/pixelCrop{mod}.png',out)
+    return out
+
+def get_orig_image(imgpath, labelpath):
+    image = cv2.imread(imgpath)[:,:,0]
+    image = cv2.resize(image, (224,224),interpolation = cv2.INTER_CUBIC)
+    mod = imgpath.rsplit(os.path.sep,2)[1]
+    #cv2.imwrite(f'/home/maanvi/Desktop/actual{mod}.png',image)
+    return image
+
 def getImage(imagePath, labelPath, cropType=None):
-    print(imagePath, labelPath)
     if cropType is None:
         #read image full and pass back
-        return
+        return get_orig_image(imagePath,labelPath)
     
     if cropType == 'center':
         #center crop and pass back
-        return
+        return get_tumor_boundingbox(imagePath, labelPath)
     
     if cropType == 'pixel':
         #crop based on segmentation label and pass back
-        return
+        return get_exact_tumor(imagePath, labelPath)
 
-subject_path = r'D:\Ddesktop\17235387'
-#subject_path = '/home/maanvi/Desktop/74298266'
-modalities = ['am','dc','ec','pc','tm']
-clas = 'AML'
-gathered_modalityPaths = {
-    modality: set(
-        os.listdir(
-            os.path.join(
-                subject_path,modality
+
+def getSubjectData(subject_path, modalities, clas):
+#subject_path = r'D:\Ddesktop\17235387'
+#subject_path = '/home/maanvi/LAB/Datasets/kt_new_trainvaltest/am_dc_ec_pc_tm/train/AML/89668505'
+#modalities = ['am','dc','ec','pc','tm']
+#clas = 'AML'
+    gathered_modalityPaths = {
+        modality: set(
+            os.listdir(
+                os.path.join(
+                    subject_path,modality
+                )
             )
         )
-    )
-    for modality in modalities
-}
-print(gathered_modalityPaths)
-same_named_imageNames = set.intersection(
-    *map(
-        lambda slices:
-        set(
-            map(
-                lambda name: os.path.splitext(name)[0], slices
-            )
-        ), gathered_modalityPaths.values()
-    )
-)
-
-for temp in modalities:
-        gathered_modalityPaths[temp] = {k+'.png' for k in same_named_imageNames}
-
-for modality in modalities:
-        gathered_modalityPaths[modality] = list(
-            filter(lambda x: os.path.splitext(x)[0],
-            gathered_modalityPaths[modality])
-        )
-print(gathered_modalityPaths)
-
-
-subject_data = {}
-cropType = 'center'
-#crop type mapping: {'centerCrop'->'center','pixelCrop'->'pixel',None->'fullImage'}
-for modality,names in gathered_modalityPaths.items():
-    subject_data[modality] = {
-        os.path.splitext(name)[0]:getImage(os.path.join(subject_path,modality,name),os.path.join(subject_path,modality+'L',name),cropType) for name in names
+        for modality in modalities
     }
+    #print(gathered_modalityPaths)
+    same_named_imageNames = set.intersection(
+        *map(
+            lambda slices:
+            set(
+                map(
+                    lambda name: os.path.splitext(name)[0], slices
+                )
+            ), gathered_modalityPaths.values()
+        )
+    )
 
+    for temp in modalities:
+            gathered_modalityPaths[temp] = {k+'.png' for k in same_named_imageNames}
+
+    for modality in modalities:
+            gathered_modalityPaths[modality] = list(
+                filter(lambda x: os.path.splitext(x)[0],
+                gathered_modalityPaths[modality])
+            )
+    print(gathered_modalityPaths)
+
+
+    subject_data = {}
+    cropType = 'pixel'
+    #crop type mapping: {'centerCrop'->'center','pixelCrop'->'pixel',None->'fullImage'}
+    for modality,names in gathered_modalityPaths.items():
+        subject_data[modality] = {
+            os.path.splitext(name)[0]:getImage(os.path.join(subject_path,modality,name),os.path.join(subject_path,modality+'L',name),cropType) for name in names
+        }
+
+    print(subject_data)
 
 
 #next tasks
