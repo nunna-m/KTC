@@ -1,48 +1,7 @@
 import numpy as np
 import os
 import cv2
-from regex import P
-'''
-subject_data = {
-    'subject_path': 'D:\\01_Maanvi\\LABB\\datasets\\kt_new_trainvaltest\\fold1\\am_ec\\train\\AML\\16313384', 'clas': 'AML', \
-    'ID': '16313384', 
-    'num_slices_per_modality': 2, 
-    'am': {
-        '2':[[0, 1, 0, 0, 0, 0],
-       [0, 0, 0, 0, 3, 0],
-       [0, 0, 2, 0, 0, 5]], 
-       '1': [[3, 0, 2, 0, 1, 0],
-       [5, 0, 4, 0, 0, 3],
-       [5, 0, 0, 0, 1, 1]]
-    }, 
-    'ec': {
-        '2': [[2, 2, 0, 0, 0, 1],
-       [1, 1, 0, 0, 5, 0],
-       [0, 0, 0, 0, 3, 4]], 
-       '1':[[5, 1, 3, 0, 0, 0],
-       [0, 4, 0, 2, 0, 0],
-       [0, 0, 3, 0, 0, 5],]
-    }
-}
 
-modalities = subject_data['subject_path'].rsplit(os.path.sep,5)[-4]
-try:
-    assert '_' in modalities
-    modalities = modalities.split('_')
-except AssertionError:
-    print(f"need modailities with _ but got this instead '{modalities}'")
-
-imageNames = list(subject_data[modalities[0]].keys())
-for name in imageNames:
-    image = None
-    for modality in modalities:
-        if image is None:
-            image = np.array(subject_data[modality][name])
-        else:
-            image = np.dstack([image, np.array(subject_data[modality][name])])
-    
-    print(f"{name}.png -- shape {image.shape}")
-'''
 def get_tumor_boundingbox(imgpath, labelpath):
     '''
     get the bounding box coordinates around tumor
@@ -206,7 +165,7 @@ def getSubjectData(subject_path, cropType):
 def combineData(subjectPath, storePath, cropType):
     # tempSubjectPath = '/home/maanvi/LAB/Datasets/kt_new_trainvaltest/am_pc_tm/train/CCRCC/17672172'
     subject_data = getSubjectData(subjectPath, cropType)
-    print(subject_data['path'])
+    #print(subject_data['path'])
     modalities = subject_data['path'].rsplit(os.path.sep,4)[1]
     try:
         if len(modalities) > 2:
@@ -217,7 +176,8 @@ def combineData(subjectPath, storePath, cropType):
     except AssertionError:
         print(f"need modailities with _ but got this instead '{modalities}'")
 
-    print(modalities)
+    modalities = sorted(modalities, reverse=False)
+    #print(modalities)
     imageNames = list(subject_data[modalities[0]].keys())
     for name in imageNames:
         image = None
@@ -238,7 +198,7 @@ def combineData(subjectPath, storePath, cropType):
             # print(f'{image.shape} prev img shape')
             image = np.dstack((image,zeros))
         
-        print(f"{name}.png -- shape {image.shape}")
+        #print(f"{name}.png -- shape {image.shape}")
         filename = f"{subject_data['ID']}_{subject_data['clas']}_{name}.npz"
         np.savez(os.path.join(storePath,filename))
         #cv2.imwrite(f'/home/maanvi/Desktop/combined{name}.png',image)
@@ -253,3 +213,27 @@ def combineData(subjectPath, storePath, cropType):
 #4. get the images and store in RGB image format and store the images as subjectID_1.png, subjectID_2.png... in subject folder for all modalities <= 3 (duplicate thrice, append 0s or use all 3)
 #5. another file write function to go to every subject and collect images, print out shape and check if shape is matching
 #6. store training and testing collected numpy arrays .npys for every fold
+
+'''
+subject_data = {
+    'subject_path': 'D:\\01_Maanvi\\LABB\\datasets\\kt_new_trainvaltest\\fold1\\am_ec\\train\\AML\\16313384', 'clas': 'AML', \
+    'ID': '16313384', 
+    'num_slices_per_modality': 2, 
+    'am': {
+        '2':[[0, 1, 0, 0, 0, 0],
+       [0, 0, 0, 0, 3, 0],
+       [0, 0, 2, 0, 0, 5]], 
+       '1': [[3, 0, 2, 0, 1, 0],
+       [5, 0, 4, 0, 0, 3],
+       [5, 0, 0, 0, 1, 1]]
+    }, 
+    'ec': {
+        '2': [[2, 2, 0, 0, 0, 1],
+       [1, 1, 0, 0, 5, 0],
+       [0, 0, 0, 0, 3, 4]], 
+       '1':[[5, 1, 3, 0, 0, 0],
+       [0, 4, 0, 2, 0, 0],
+       [0, 0, 3, 0, 0, 5],]
+    }
+}
+'''
