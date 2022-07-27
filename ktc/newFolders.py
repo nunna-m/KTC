@@ -60,6 +60,7 @@ def createRawDataFolder(oldPath, newPath):
 
 def createNumpyFiles(oldPath, newPath):
     for modFolder in os.listdir(oldPath):
+        print(f"creating numpy files of {modFolder}")
         for folder in ['5CV','10CV']:
             foldsPath = os.path.join(newPath,modFolder,'foldDataFiles',folder)
             for foldD in os.listdir(foldsPath):

@@ -112,7 +112,7 @@ def getImage(imagePath, labelPath, cropType=None):
 
 
 def getSubjectData(subject_path, cropType):
-    print(cropType)
+    #print(cropType)
     pathParts = subject_path.rsplit(os.path.sep, 4)
     modalities = pathParts[1].split('_')
     subject_data = {}
