@@ -200,7 +200,9 @@ def combineData(subjectPath, storePath, cropType):
         
         #print(f"{name}.png -- shape {image.shape}")
         filename = f"{subject_data['ID']}_{subject_data['clas']}_{name}.npz"
-        np.savez(os.path.join(storePath,filename))
+        labelMapping = {'AML':0,'CCRCC':1}
+        #data = {'image':image,'label':labelMapping[subject_data['clas']]}
+        np.savez(os.path.join(storePath,filename),image=image,label=labelMapping[subject_data['clas']])
         #cv2.imwrite(f'/home/maanvi/Desktop/combined{name}.png',image)
     
     return image
