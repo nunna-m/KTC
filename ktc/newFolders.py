@@ -46,7 +46,7 @@ def createRawDataFolder(oldPath, newPath):
                 source = os.path.join(oldPath,modFolder,splitType,clas)
                 dest = os.path.join(newPath,modFolder,'rawData',clas)
                 for subjectID in os.listdir(source):
-                    shutil.copytree(os.path.join(source,subjectID),os.path.join(dest,subjectID),dirs_exist_ok=True)
+                    shutil.copytree(os.path.join(source,subjectID),os.path.join(dest,subjectID))
 
     # for modFolder in os.listdir(oldPath):
     #     for clas in classes:
