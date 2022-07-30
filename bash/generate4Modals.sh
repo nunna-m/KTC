@@ -1,0 +1,5 @@
+python3 -m ktc.pre split --whichos linux --path "/home/maanvi/LAB/github/KidneyTumorClassification/ktc/pre/paths.yaml" --modalities ['am','dc','ec','pc']
+python3 -m ktc.pre split --whichos linux --path "/home/maanvi/LAB/github/KidneyTumorClassification/ktc/pre/paths.yaml" --modalities ['am','dc','ec','tm']
+python3 -m ktc.pre split --whichos linux --path "/home/maanvi/LAB/github/KidneyTumorClassification/ktc/pre/paths.yaml" --modalities ['am','dc','pc','tm']
+python3 -m ktc.pre split --whichos linux --path "/home/maanvi/LAB/github/KidneyTumorClassification/ktc/pre/paths.yaml" --modalities ['am','ec','pc','tm']
+python3 -m ktc.pre split --whichos linux --path "/home/maanvi/LAB/github/KidneyTumorClassification/ktc/pre/paths.yaml" --modalities ['dc','ec','pc','tm']
