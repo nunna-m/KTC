@@ -1,26 +1,31 @@
-am
-tm
-dc
-ec
-pc
-dc ec
-ec pc
-dc pc
-am dc
-am ec
-am pc
-dc tm
-ec tm
-pc tm
-am dc ec
-am ec pc
-am dc pc
-dc ec tm
-ec pc tm
-dc pc tm
-am dc tm
-am ec tm
-am pc tm
-am tm
-dc ec pc
-am dc ec pc tm
+am 
+dc 
+ec 
+pc 
+tm 
+am  dc
+am  ec
+am  pc
+am  tm
+dc  ec
+dc  pc
+dc  tm
+ec  pc
+ec  tm
+pc  tm
+am  dc  ec
+am  dc  pc
+am  dc  tm
+am  ec  pc
+am  ec  tm
+am  pc  tm
+dc  ec  pc
+dc  ec  tm
+dc  pc  tm
+ec  pc  tm
+am  dc  ec  pc
+am  dc  ec  tm
+am  dc  pc  tm
+am  ec  pc  tm
+dc  ec  pc  tm
+am  dc  ec  pc  tm
