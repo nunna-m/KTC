@@ -1,0 +1,5 @@
+python -m ktc.pre split --whichos windows --path "D:\01_Maanvi\LABB\github\KidneyTumorClassification/ktc/pre/paths.yaml" --modalities ['am','dc','ec','pc']
+python -m ktc.pre split --whichos windows --path "D:\01_Maanvi\LABB\github\KidneyTumorClassification/ktc/pre/paths.yaml" --modalities ['am','dc','ec','tm']
+python -m ktc.pre split --whichos windows --path "D:\01_Maanvi\LABB\github\KidneyTumorClassification/ktc/pre/paths.yaml" --modalities ['am','dc','pc','tm']
+python -m ktc.pre split --whichos windows --path "D:\01_Maanvi\LABB\github\KidneyTumorClassification/ktc/pre/paths.yaml" --modalities ['am','ec','pc','tm']
+python -m ktc.pre split --whichos windows --path "D:\01_Maanvi\LABB\github\KidneyTumorClassification/ktc/pre/paths.yaml" --modalities ['dc','ec','pc','tm']
