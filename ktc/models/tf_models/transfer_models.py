@@ -157,9 +157,77 @@ class vgg16_net(Model):
         super().__init__(**kargs)
         self.base_model = tf.keras.applications.VGG16(input_shape=(224, 224, 3), include_top=False, weights='imagenet')
         #self.base_model = add_regularization(self.base_model)
+        for self.layer in self.base_model.layers:
+            self.layer.trainable = False
+        
+        self.last_layer = self.base_model.get_layer('block5_pool')
+        self.top_model = self.last_layer.output
+        self.gap = layers.GlobalAveragePooling2D()
+        self.dense1 = layers.Dense(512, activation=activation)
+        self.dropout = layers.Dropout(0.2)
+        self.dense2 = layers.Dense(256, activation=activation)
+        self.dense3 = layers.Dense(classifier_neurons, activation=classifier_activation)
+        
+    
+    @tf.function
+    def call(self, input_tensor, training=False):
+        x = self.base_model(input_tensor)
+        x = self.gap(x)
+        x = self.dense1(x)
+        x = self.dense2(x)
+        x = self.dropout(x)
+        x = self.dense3(x)
+        return x
+
+class vgg16_net_lastblocktrain(Model):
+    def __init__(
+        self,
+        activation='relu',
+        classifier_activation='softmax',
+        classifier_neurons=2,
+        **kargs,
+    ):
+        super().__init__(**kargs)
+        self.base_model = tf.keras.applications.VGG16(input_shape=(224, 224, 3), include_top=False, weights='imagenet')
+        #self.base_model = add_regularization(self.base_model)
         for self.layer in self.base_model.layers[:15]:
             self.layer.trainable = False
         for self.layer in self.base_model.layers[15:]:
+            self.layer.trainable = True
+        
+        self.last_layer = self.base_model.get_layer('block5_pool')
+        self.top_model = self.last_layer.output
+        self.gap = layers.GlobalAveragePooling2D()
+        self.dense1 = layers.Dense(512, activation=activation)
+        self.dropout = layers.Dropout(0.2)
+        self.dense2 = layers.Dense(256, activation=activation)
+        self.dense3 = layers.Dense(classifier_neurons, activation=classifier_activation)
+        
+    
+    @tf.function
+    def call(self, input_tensor, training=False):
+        x = self.base_model(input_tensor)
+        x = self.gap(x)
+        x = self.dense1(x)
+        x = self.dense2(x)
+        x = self.dropout(x)
+        x = self.dense3(x)
+        return x
+
+class vgg16_net_last2train(Model):
+    def __init__(
+        self,
+        activation='relu',
+        classifier_activation='softmax',
+        classifier_neurons=2,
+        **kargs,
+    ):
+        super().__init__(**kargs)
+        self.base_model = tf.keras.applications.VGG16(input_shape=(224, 224, 3), include_top=False, weights='imagenet')
+        #self.base_model = add_regularization(self.base_model)
+        for self.layer in self.base_model.layers:
+            self.layer.trainable = False
+        for self.layer in self.base_model.layers[-2:]:
             self.layer.trainable = True
         
         self.last_layer = self.base_model.get_layer('block5_pool')
@@ -214,7 +282,7 @@ class vgg19_net(Model):
         x = self.dense3(x)
         return x
 
-class vgg19_net_last5train(Model):
+class vgg19_net_lastblocktrain(Model):
     def __init__(
         self,
         activation='relu',
@@ -225,7 +293,8 @@ class vgg19_net_last5train(Model):
         super().__init__(**kargs)
         self.base_model = tf.keras.applications.VGG19(input_shape=(224, 224, 3), include_top=False, weights='imagenet')
         #self.base_model = add_regularization(self.base_model)
-        self.base_model.trainable = False
+        for self.layer in self.base_model.layers:
+            self.layer.trainable = False
         for self.layer in self.base_model.layers[-5:]:
             self.layer.trainable = True
         
