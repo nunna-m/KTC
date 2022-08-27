@@ -106,6 +106,8 @@ def train(
             model = transfer_models.vgg19_net(classifier_activation='softmax')
         elif network == 'vgg19_lastblocktrain':
             model = transfer_models.vgg19_net_lastblocktrain(classifier_activation='softmax')
+        elif network == 'vgg19_last2train':
+            model = transfer_models.vgg19_net_last2train(classifier_activation='softmax')
         model.compile(
             optimizer=tf.keras.optimizers.Adam(learning_rate=base_learning_rate),
             loss=tf.keras.losses.CategoricalCrossentropy(),
