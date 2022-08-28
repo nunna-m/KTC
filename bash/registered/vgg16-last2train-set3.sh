@@ -1,8 +1,0 @@
-python3 -m ktc train_registered --whichos remote --modalities dc ec tm --method both --network vgg16_last2train --config "configfiles/extra/data_options_registered.yaml" --max_steps 50 --filename vgg16_last2train_boxCrop
-python3 -m ktc train_registered --whichos remote --modalities ec pc tm --method both --network vgg16_last2train --config "configfiles/extra/data_options_registered.yaml" --max_steps 50 --filename vgg16_last2train_boxCrop
-python3 -m ktc train_registered --whichos remote --modalities dc pc tm --method both --network vgg16_last2train --config "configfiles/extra/data_options_registered.yaml" --max_steps 50 --filename vgg16_last2train_boxCrop
-python3 -m ktc train_registered --whichos remote --modalities am dc tm --method both --network vgg16_last2train --config "configfiles/extra/data_options_registered.yaml" --max_steps 50 --filename vgg16_last2train_boxCrop
-python3 -m ktc train_registered --whichos remote --modalities am ec tm --method both --network vgg16_last2train --config "configfiles/extra/data_options_registered.yaml" --max_steps 50 --filename vgg16_last2train_boxCrop
-python3 -m ktc train_registered --whichos remote --modalities am pc tm --method both --network vgg16_last2train --config "configfiles/extra/data_options_registered.yaml" --max_steps 50 --filename vgg16_last2train_boxCrop
-python3 -m ktc train_registered --whichos remote --modalities am tm --method both --network vgg16_last2train --config "configfiles/extra/data_options_registered.yaml" --max_steps 50 --filename vgg16_last2train_boxCrop
-python3 -m ktc train_registered --whichos remote --modalities dc ec pc --method both --network vgg16_last2train --config "configfiles/extra/data_options_registered.yaml" --max_steps 50 --filename vgg16_last2train_boxCrop
