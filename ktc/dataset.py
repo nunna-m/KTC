@@ -1,6 +1,7 @@
 '''
 abstraction for tf.data.Dataset API
 '''
+from email.errors import NoBoundaryInMultipartDefect
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
 
@@ -85,6 +86,75 @@ def train_ds(
     print("Final dataset:  ",dataset)
     return dataset
 
+def train_ds_registered(
+    data_root,
+    modalities,
+    batch_size,
+    buffer_size,
+    repeat = True,
+    output_size=(224,224),
+    aug_configs=None,
+    tumor_region_only=False,
+):
+    '''
+    create train dataset
+
+    Args:
+        data_root: file with training and testing subject filenames for a specific CV fold, 'train' key filenames indicating train data is selected
+        modalities: ct or mri or both modalities
+        batch_size: batch size
+        buffer_size: buffer_size
+        repeat: flag indicating if dataset be repeated defaults True
+        output_size: size of images in the dataset defaults (224,224)
+        aug_configs (dict): augmentation configurations
+        tumor_region_only: flag indicating cropped to rectangular box around tumor defaults False
+    '''
+    if aug_configs is None:
+        aug_configs = {
+            'random_crop':{},
+        }
+    default_aug_configs = {
+        random_crop_img: dict(output_size=output_size),
+        random_horizontalflip_img: {},
+        random_verticalflip_img: {},
+        random_contrast_img:  dict(channels=list(range(len(modalities)))),
+        random_brightness_img: {},
+        random_hue_img: {},
+        random_saturation_img: {},
+        random_rotation_img: {},
+        random_shear_img: {},
+        flip_leftright_img: {},
+        rotate90_img: {},
+        rotate180_img: {},
+        rotate270_img: {},
+        up_rotate90_img: {},
+        up_rotate180_img: {},
+        up_rotate270_img: {},
+    }
+    with open(data_root,'r') as file:
+        data = yaml.safe_load(file)
+    traindir = data['train']
+    dataset = load_raw_registered(
+        traindir,
+        modalities=modalities,
+        output_size=output_size,
+        tumor_region_only = tumor_region_only,
+    )
+    dataset = augmentation(
+        dataset,
+        methods=parse_aug_configs(aug_configs,
+                                    default_aug_configs),
+    )
+
+    dataset = configure_dataset(
+        dataset,
+        batch_size,
+        buffer_size,
+        repeat=repeat
+    )
+    print("Final dataset:  ",dataset)
+    return dataset
+
 def eval_ds(
     data_root,
     modalities,
@@ -104,6 +174,34 @@ def eval_ds(
     '''
     evaldir = os.path.join(data_root,'_'.join(modalities),'val')
     ds = load_raw(
+        evaldir,
+        modalities=modalities,
+        output_size=output_size,
+        tumor_region_only = tumor_region_only
+    )
+    ds = ds.batch(batch_size)
+    ds = ds.prefetch(tf.data.experimental.AUTOTUNE)
+    return ds
+
+def eval_ds_registered(
+    data_root,
+    modalities,
+    batch_size,
+    output_size=(224,224),
+    tumor_region_only=False,
+):
+    '''
+    create validation dataset (not in use when crossvalidation being used)
+
+    Args:
+        data_root: file with validation subject filenames
+        modalities: ct or mri or both modalities
+        batch_size: batch size
+        output_size: size of images in the dataset defaults (224,224)
+        tumor_region_only: flag indicating cropped to rectangular box around tumor defaults False
+    '''
+    evaldir = os.path.join(data_root,'_'.join(modalities),'val')
+    ds = load_raw_registered(
         evaldir,
         modalities=modalities,
         output_size=output_size,
@@ -133,6 +231,29 @@ def predict_ds(data_root,
         data = yaml.safe_load(file)
     testdir = data['test']
     ds = load_raw(testdir,modalities=modalities, output_size=output_size, tumor_region_only=tumor_region_only)
+    ds = ds.batch(batch_size)
+    return ds
+
+def predict_ds_registered(data_root,
+         modalities,
+         batch_size,
+         output_size=(224,224),
+         tumor_region_only=False,
+):
+    '''
+    create testing dataset
+
+    Args:
+        data_root: file with training and testing subject filenames for a specific CV fold, 'test' key filenames indicating test data is selected
+        modalities: ct or mri or both modalities
+        batch_size: batch size
+        output_size: size of images in the dataset defaults (224,224)
+        tumor_region_only: flag indicating cropped to rectangular box around tumor defaults False
+    '''
+    with open(data_root,'r') as file:
+        data = yaml.safe_load(file)
+    testdir = data['test']
+    ds = load_raw_registered(testdir,modalities=modalities, output_size=output_size, tumor_region_only=tumor_region_only)
     ds = ds.batch(batch_size)
     return ds
 
@@ -167,6 +288,63 @@ def load_raw(traindir,
     feature_ds = ds.interleave(
             partial(
                 tf_combine_modalities,
+                output_size=output_size,
+                modalities=modalities,
+                tumor_region_only=tumor_region_only,
+                return_type='dataset',
+            ),
+            cycle_length=count(ds),
+            num_parallel_calls=tf.data.experimental.AUTOTUNE,
+        )
+    
+    if output_size is not None: feature_ds = feature_ds.map(
+            lambda image: tf.image.crop_to_bounding_box(
+                image,
+                ((tf.shape(image)[:2] - output_size) // 2)[0],
+                ((tf.shape(image)[:2] - output_size) // 2)[1],
+                *output_size,
+            ),
+            tf.data.experimental.AUTOTUNE,
+        )
+    ds = tf.data.Dataset.zip((feature_ds, label_ds))
+    if len(modalities) <= 3:
+        norm = 3
+    else:
+        norm = len(modalities)
+    ds = ds.map(lambda image, label: tf_reshape_cast_normalize(image, label, num_mod=norm, dtype=dtype), tf.data.experimental.AUTOTUNE)
+    return ds
+
+def load_raw_registered(traindir, 
+            modalities=('am','tm','dc','ec','pc'), 
+            output_size=(224,224), 
+            tumor_region_only=False, 
+            dtype=tf.float32
+):
+    '''
+    generate the basic raw dataset
+
+    Args:
+        traindir list[str]: list of training subject directories
+        modalities: ct or mri or both modalities
+        tumor_region_only: flag indicating cropped to rectangular box around tumor defaults False
+        dtype: type to convert to defaults float32
+    '''
+    training_subject_paths = traindir
+    ds = tf.data.Dataset.from_tensor_slices(training_subject_paths)
+    label_ds = ds.interleave(
+            partial(
+                tf_combine_labels,
+                modalities=modalities,
+                return_type='dataset',
+            ),
+            cycle_length=count(ds),
+            num_parallel_calls=tf.data.experimental.AUTOTUNE,
+        )
+    #convert to one_hot because using categorical crossentropy loss function
+    label_ds = label_ds.map(convert_one_hot)
+    feature_ds = ds.interleave(
+            partial(
+                tf_combine_modalities_registered,
                 output_size=output_size,
                 modalities=modalities,
                 tumor_region_only=tumor_region_only,
@@ -276,6 +454,27 @@ def tf_combine_modalities(subject_path, output_size, modalities, tumor_region_on
         )
     else: raise NotImplementedError
 
+def tf_combine_modalities_registered(subject_path, output_size, modalities, tumor_region_only,return_type='array'):
+    '''
+    outer function to stack different images of each modality for every subject
+    '''
+    return_type  =return_type.lower()
+    if return_type == 'array':
+        return tf.py_function(
+            lambda x: partial(combine_modalities_registered, output_size=output_size,
+            modalities=modalities,
+            tumor_region_only=tumor_region_only)(x)['slices'],
+            [subject_path],
+            tf.uint8,
+        )
+    elif return_type == 'dataset':
+        return tf.data.Dataset.from_tensor_slices(
+            tf_combine_modalities(subject_path=subject_path,output_size=output_size,
+            modalities=modalities,
+            tumor_region_only=tumor_region_only, return_type='array')
+        )
+    else: raise NotImplementedError
+
 def combine_modalities(subject, output_size, modalities, tumor_region_only):
     '''
     inner function to stack different labels of each modality for every subject
@@ -306,6 +505,31 @@ def combine_modalities(subject, output_size, modalities, tumor_region_only):
         slices.append(modals)
     slices = tf.stack(slices, axis=0)
 
+    return dict(
+        slices=slices,
+        subject_path=subject_data['subject_path'],
+    )
+
+def combine_modalities_registered(subject, output_size, modalities, tumor_region_only):
+    '''
+    generate registered image based on modalities (for now modalities == 2)
+    tumor_region_only set to False because we want box crop (as registered images are not labeled)
+    NOTE: some registered images are transformed (translated, rotated, sheared etc) during the registration process hence rendering the exact labels of the tumors useless for cropping out pixel perfect regions
+    finally take the registered image duplicate thrice (to emulate rgb) and send back with class label
+    '''
+    if isinstance(subject, str): pass
+    elif isinstance(subject, tf.Tensor): subject = subject.numpy().decode()
+    else: raise NotImplementedError
+    subject_data = parse_subject_registered(subject, output_size, modalities=modalities, tumor_region_only=False)
+    slice_names = subject_data['registered_images'].keys()
+    assert len(modalities) > 1
+    images = []
+    for name in slice_names:
+        diff = 3
+        img = subject_data['registered_images'][name]
+        final_image = tf.repeat(img, repeats=[diff],axis=-1)
+        images.append(final_image)
+    slices = tf.stack(images, axis=0)
     return dict(
         slices=slices,
         subject_path=subject_data['subject_path'],
@@ -388,6 +612,44 @@ def parse_subject(subject_path,
         #     }
     return subject_data
 
+def parse_subject_registered(subject_path, 
+                    output_size, 
+                    modalities,
+                    tumor_region_only,):
+    '''
+    take directory of subject and return decoded images
+    
+    Args:
+        subject_path: subject directory with the images of various modalites
+        output_size: final size to which images are resized before returning
+        modalities: ct or mri or both
+        tumor_region_only (bool): true indicates cropping to a pixel perfect region false: rectangular box around the tumor region
+    '''
+    registered_subject_path = subject_path.replace('kt_new_trainvaltest','kt_registered')
+    subject_data = {'subject_path': subject_path, 'registered_subject_path': registered_subject_path}
+    
+    subject_data['clas'], subject_data['ID'] = get_class_ID_subjectpath(subject_path)
+    sliceNames = os.listdir(registered_subject_path)
+    subject_data['num_slices_per_modality']=len(sliceNames)
+    #newPath = '/home/maanvi/LAB/Datasets/kt_registered/ec_tm/train/AML/16639185'
+    hereModalities = registered_subject_path.rsplit(os.path.sep,4)[1].split('_')
+
+    if 'am' in modalities:
+        modalityForLabelPath = 'am'
+    else:
+        modalityForLabelPath = hereModalities[-1]
+
+    subject_data['registered_images'] = dict()
+    if tumor_region_only:
+        for name in sliceNames:
+            subject_data['registered_images'][name] = get_exact_tumor(os.path.join(registered_subject_path,name),os.path.join(subject_path,modalityForLabelPath+'L',name))
+    else:
+        for name in sliceNames:
+            subject_data['registered_images'][name] = get_tumor_boundingbox_registered(os.path.join(registered_subject_path,name),os.path.join(subject_path,modalityForLabelPath+'L',name))
+
+    print(subject_data['registered_images']['1.png'].shape)
+    return subject_data
+
 def get_class_ID_subjectpath(subject):
     '''
     based on subject folder path extract tumor class and subject ID
@@ -398,27 +660,62 @@ def get_class_ID_subjectpath(subject):
     assert clas in ('AML', 'CCRCC'), f'Classification category{clas} extracted from : {subject} unknown'
     return clas, ID
 
-def crop(img, resize_shape, crop_dict):
+def get_tumor_boundingbox_registered(imgpath, labelpath):
     '''
-    crop the image to a rectangular bounding box around the tumor region
+    get the bounding box coordinates around tumor
+    first calculate center of tumor based on segmentation label
+    then calculate bounding box around it after zooming out by a factor of 0.3 on both heigth and width (just to be sure of including the entire region of the tumor)
+    am modality is gaussian standardized also
     '''
-    tumor_center = {
-            'y':crop_dict['y']+(crop_dict['height']//2),
-            'x':crop_dict['x']+(crop_dict['width']//2),
-    }
-    
-    img = img.numpy()
-    (h, w) = resize_shape    
-    y1 = tumor_center['y'] - h//2
-    x1 = tumor_center['x'] - w//2
-    y2 = tumor_center['y'] + h//2
-    x2 = tumor_center['x'] + w//2
-    for i in [y1,x1,y2,x2]:
-        assert i>0, f'height or width going out of bounds'
-    
-    img = tf.convert_to_tensor(img, dtype=tf.uint8)
-    return img
+    orig_image = cv2.imread(imgpath)[:,:,0]
+    cv2.imwrite(f'/home/maanvi/registered_{imgpath[-5]}.png',orig_image)
+    (orig_height, orig_width) = cv2.imread(imgpath)[:,:,0].shape
+    image = cv2.imread(labelpath)
+    image = cv2.resize(image, (orig_width, orig_height))
+    backup = image.copy()
+    lower_red = np.array([0,0,50])
+    upper_red = np.array([0,0,255])
+    mask = cv2.inRange(image, lower_red, upper_red)
+    contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2. CHAIN_APPROX_NONE)
+    c = max(contours, key=cv2.contourArea)
+    x, y, w, h = cv2.boundingRect(c)
+    assert (w,h)<(224,224)
+    assert (x,y)>=(0,0)
+    const = 0.8
+    diff_x = int(const*w)
+    diff_y = int(const*h)
+    if (x-diff_x)<0:
+        x1 = 0
+    else:
+        x1 = x-diff_x
+    if (y-diff_y)<0:
+        y1 = 0
+    else:
+        y1 = y-diff_y
+    if (x+w+diff_x)>=orig_width:
+        x2 = orig_width
+    else:
+        x2 = x+diff_x+w
+    if (y+diff_y+h)>=orig_height:
+        y2 = orig_height
+    else:
+        y2 = y+diff_y+h
 
+
+    #gaussian standardizes only modality am
+    tmp = imgpath.rsplit(os.path.sep,2)[1]
+    if tmp=='am':
+        mean, std = orig_image.mean(), orig_image.std()
+        orig_image = (orig_image - mean)/std
+        mean, std = orig_image.mean(), orig_image.std()
+        orig_image = np.clip(orig_image, -1.0, 1.0)
+        orig_image = (orig_image + 1.0) / 2.0
+        orig_image *= 255
+    backup = orig_image[y1:y2,x1:x2]
+    backup = cv2.resize(backup, (224,224),interpolation = cv2.INTER_LINEAR)
+    cv2.imwrite(f'/home/maanvi/registered_resize{imgpath[-5]}.png',backup)
+    backup = tf.convert_to_tensor(backup, dtype=tf.uint8)
+    return backup
 def get_exact_tumor(imgpath, labelpath):
     '''
     get the exact segmented tumor region (pixel perfect) based on label already provided
@@ -451,8 +748,8 @@ def get_exact_tumor(imgpath, labelpath):
     (bottomy, bottomx) = (np.max(y), np.max(x))
     out = out[topy:bottomy+1, topx:bottomx+1]
     out = cv2.resize(out, (224,224), interpolation=cv2.INTER_CUBIC)
+    #cv2.imwrite(f'/home/maanvi/registered_resize_exact{imgpath[-5]}.png',out)
     out = tf.convert_to_tensor(out, dtype=tf.uint8)
-    #cv2.imwrite('/home/maanvi/Desktop/segmented.png',out)
     return out
 def get_tumor_boundingbox(imgpath, labelpath):
     '''
@@ -506,6 +803,7 @@ def get_tumor_boundingbox(imgpath, labelpath):
         orig_image *= 255
     backup = orig_image[y1:y2,x1:x2]
     backup = cv2.resize(backup, (224,224),interpolation = cv2.INTER_LINEAR)
+    cv2.imwrite('/home/maanvi/registered_resize.png',backup)
     backup = tf.convert_to_tensor(backup, dtype=tf.uint8)
     return backup
 
@@ -857,9 +1155,7 @@ def count(ds):
     return size
 
 
-# print(parse_subject(r'D:\01_Maanvi\LABB\datasets\kt_new_trainvaltest\fold1\am_dc_ec_pc_tm\test\AML\16639185', 
+# print(parse_subject_registered('/home/maanvi/LAB/Datasets/kt_new_trainvaltest/am_ec/train/CCRCC/16269495', 
 #                     (224,224), 
-#                     ('am','dc','ec','pc','tm'),
-#                     tumor_region_only=True, 
-#                     decoder=tf.image.decode_image, 
-#                     resize=tf.image.resize))
+#                     ('ec','tm'),
+#                     tumor_region_only=False,))
