@@ -37,6 +37,8 @@ def train_registered(
         filename: desired metrics filename, default is numAug_network_numberofepochs
     '''
     config = load.load_config(config)
+    print("creating results folder if doesn't already exist: ")
+    os.makedirs(config['data_options'][whichos]['save_path'], exist_ok=True)
     modalities = sorted(modalities, reverse=False)
     print("Modalities: %s"%modalities)
     print("Operating System: {}".format(whichos))
