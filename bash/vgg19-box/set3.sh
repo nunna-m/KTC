@@ -1,0 +1,8 @@
+python3 -m ktc train --whichos remote --modalities dc ec tm --method both --network vgg19_lastblocktrain --config "configfiles/extra/data_options_box.yaml" --max_steps 50 --filename vgg19_lastblocktrain_box
+python3 -m ktc train --whichos remote --modalities ec pc tm --method both --network vgg19_lastblocktrain --config "configfiles/extra/data_options_box.yaml" --max_steps 50 --filename vgg19_lastblocktrain_box
+python3 -m ktc train --whichos remote --modalities dc pc tm --method both --network vgg19_lastblocktrain --config "configfiles/extra/data_options_box.yaml" --max_steps 50 --filename vgg19_lastblocktrain_box
+python3 -m ktc train --whichos remote --modalities am dc tm --method both --network vgg19_lastblocktrain --config "configfiles/extra/data_options_box.yaml" --max_steps 50 --filename vgg19_lastblocktrain_box
+python3 -m ktc train --whichos remote --modalities am ec tm --method both --network vgg19_lastblocktrain --config "configfiles/extra/data_options_box.yaml" --max_steps 50 --filename vgg19_lastblocktrain_box
+python3 -m ktc train --whichos remote --modalities am pc tm --method both --network vgg19_lastblocktrain --config "configfiles/extra/data_options_box.yaml" --max_steps 50 --filename vgg19_lastblocktrain_box
+python3 -m ktc train --whichos remote --modalities am tm --method both --network vgg19_lastblocktrain --config "configfiles/extra/data_options_box.yaml" --max_steps 50 --filename vgg19_lastblocktrain_box
+python3 -m ktc train --whichos remote --modalities dc ec pc --method both --network vgg19_lastblocktrain --config "configfiles/extra/data_options_box.yaml" --max_steps 50 --filename vgg19_lastblocktrain_box
