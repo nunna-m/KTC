@@ -1,6 +1,7 @@
 import os
 import sys
 from pathlib import Path
+import cv2
 
 def copyFolderStructure(source, dest):
     #source: /home/maanvi/LAB/Datasets/kt_new_trainvaltest/
@@ -67,14 +68,33 @@ def filterRequiredPaths():
     newfilepath = '/home/maanvi/LAB/github/KidneyTumorClassification/ktc/2ModalitiesFilePathsReduced.txt'
     with open(filepath,'r') as read_here, open(newfilepath,'w') as write_here:
         for line in read_here:
-            if 'am_tm' in line or 'dc_ec' in line or 'dc_pc' in line or 'ec_pc' in line:
+            if 'am_tm' in line or 'am_ec' in line or 'am_pc' in line or 'am_dc' in line:
                 write_here.write(line)
 
+def change_subject_path():
+    oldPath = '/home/maanvi/LAB/Datasets/kt_new_trainvaltest/ec_tm/train/AML/16639185'
+    #newPath = '/home/maanvi/LAB/Datasets/kt_registered/ec_tm/train/AML/16639185'
+    newPath = oldPath.replace('kt_new_trainvaltest','kt_registered')
+    print(f'oldpath: {oldPath}')
+    print(f'newpath: {newPath}')
+
+def displayRegisteredImage():
+    imagePath = '/home/maanvi/LAB/Datasets/kt_registered/ec_tm/train/AML/16639185/1.png'
+    image = cv2.imread(imagePath)
+    print(image.shape)
+    channel1 = image[:,:,0]
+    channel2 = image[:,:,1]
+    channel3 = image[:,:,2]
+    cv2.imwrite('/home/maanvi/channel1.png',channel1)
+    cv2.imwrite('/home/maanvi/channel2.png',channel2)
+    cv2.imwrite('/home/maanvi/channel3.png',channel3)
 
 if __name__ == "__main__":
     source = Path('/home/maanvi/LAB/Datasets/kt_new_trainvaltest')
     dest = Path('/home/maanvi/LAB/Datasets/kt_registered')
     #copyFolderStructure(source, dest)
-    createPathFiles2ModalitiesJSON(source, dest)
-    filterRequiredPaths()
+    #createPathFiles2ModalitiesJSON(source, dest)
+    #filterRequiredPaths()
+    change_subject_path()
+    #displayRegisteredImage()
 
