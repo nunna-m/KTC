@@ -512,7 +512,7 @@ def combine_modalities(subject, output_size, modalities, tumor_region_only):
 
 def combine_modalities_registered(subject, output_size, modalities, tumor_region_only):
     '''
-    generate registered image based on modalities (for now modalities == 2)
+    generate registered image based on modalities (NOT for single modalities, modalities>=2)
     tumor_region_only set to False because we want box crop (as registered images are not labeled)
     NOTE: some registered images are transformed (translated, rotated, sheared etc) during the registration process hence rendering the exact labels of the tumors useless for cropping out pixel perfect regions
     finally take the registered image duplicate thrice (to emulate rgb) and send back with class label

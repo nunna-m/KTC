@@ -12,6 +12,3 @@ end
 % path1 = 'dc.png';
 % path2 = 'pc.png';
 % reg_img = registration_function(path1,path2)
-
-
-
