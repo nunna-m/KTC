@@ -1,0 +1,46 @@
+data_options:
+    split_CTMRI: False
+    cv: 5
+    metrics_file_name: 'vgg19_14aug_exactTumor'
+    remote:
+        data_path:
+            /kw_resources/datasets/kt_new_trainvaltest
+        save_path:
+            /kw_resources/results/kidney_tumor/registered
+    linux:
+        data_path:
+            /home/maanvi/LAB/Datasets/kt_new_trainvaltest
+        save_path:
+            /home/maanvi/LAB/results/kidney_tumor/registered
+    windows:
+        data_path:
+            D:\01_Maanvi\LABB\datasets\kt_new_trainvaltest
+        save_path:
+            D:\01_Maanvi\LABB\results\kidney_tumor\registered
+    train:
+        batch_size: 32
+        buffer_size: 1024
+        output_size: [224, 224]
+        tumor_region_only: True
+        aug_configs:
+            random_horizontalflip:
+            random_verticalflip:
+            random_rotation:
+            random_brightness:
+            flip_leftright:
+            rotate90:
+            rotate180:
+            rotate270:
+            up_rotate90:
+            up_rotate180:
+            up_rotate270:
+
+    eval:
+        batch_size: 32
+        output_size: [224, 224]
+        tumor_region_only: True
+
+    test:
+        batch_size: 1
+        output_size: [224, 224]
+        tumor_region_only: True
