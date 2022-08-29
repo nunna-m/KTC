@@ -91,6 +91,38 @@ def createPathFiles3ModalitiesJSON(source, dest):
         for line in allPaths:
             fp.write(line)
 
+def createPathFiles5ModalitiesJSON(source, dest):
+    #source: /home/maanvi/LAB/Datasets/kt_new_trainvaltest/
+    #dest: /home/maanvi/LAB/Datasets/kt_registered/
+    allPaths = []
+    for modalitycombi in os.listdir(source):
+        modalities = modalitycombi.split('_')
+        if len(modalities) == 5:
+            for split_type in ['train','test','val']:
+                for clas in ['AML','CCRCC']:
+                    for subject in os.listdir(source/modalitycombi/split_type/clas):
+                        subject_path = str(source/modalitycombi/split_type/clas/subject)
+                        sameSlicePaths = getIntersectionFileNames(subject_path=subject_path,modalities=modalities)
+                        for sliceName in sameSlicePaths:
+                            if 'am' in modalities:
+                                modalities.remove('am')
+                                modalities = modalities + ['am']
+                            addThis = (
+                                os.path.join(subject_path,modalities[0],sliceName),
+                                os.path.join(subject_path,modalities[1],sliceName),
+                                os.path.join(subject_path,modalities[2],sliceName),
+                                os.path.join(subject_path,modalities[3],sliceName),
+                                os.path.join(subject_path,modalities[4],sliceName),
+                                os.path.join(dest/modalitycombi/split_type/clas/subject,sliceName)
+                            )
+                            output = ','.join(addThis)
+                            output += "\n"
+                            allPaths.append(output)
+    
+    with open('5ModalitiesFilePaths.txt','w') as fp:
+        for line in allPaths:
+            fp.write(line)
+
 def filterRequiredPaths():
     #filename: /home/maanvi/LAB/github/KidneyTumorClassification/ktc/2ModalitiesFilePaths.txt
     filepath = '/home/maanvi/LAB/github/KidneyTumorClassification/ktc/2ModalitiesFilePaths.txt'
@@ -123,7 +155,8 @@ if __name__ == "__main__":
     dest = Path('/home/maanvi/LAB/Datasets/kt_registered')
     #copyFolderStructure(source, dest)
     #createPathFiles2ModalitiesJSON(source, dest)
-    createPathFiles3ModalitiesJSON(source, dest)
+    #createPathFiles3ModalitiesJSON(source, dest)
+    createPathFiles5ModalitiesJSON(source, dest)
     #filterRequiredPaths()
     #change_subject_path()
     #displayRegisteredImage()
