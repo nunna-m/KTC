@@ -469,7 +469,7 @@ def tf_combine_modalities_registered(subject_path, output_size, modalities, tumo
         )
     elif return_type == 'dataset':
         return tf.data.Dataset.from_tensor_slices(
-            tf_combine_modalities(subject_path=subject_path,output_size=output_size,
+            tf_combine_modalities_registered(subject_path=subject_path,output_size=output_size,
             modalities=modalities,
             tumor_region_only=tumor_region_only, return_type='array')
         )
@@ -526,10 +526,11 @@ def combine_modalities_registered(subject, output_size, modalities, tumor_region
     images = []
     for name in slice_names:
         diff = 3
-        img = subject_data['registered_images'][name]
+        img = tf.expand_dims(subject_data['registered_images'][name], axis=-1)
         final_image = tf.repeat(img, repeats=[diff],axis=-1)
         images.append(final_image)
     slices = tf.stack(images, axis=0)
+    #print(f"Slice.shape: {slices.shape}")
     return dict(
         slices=slices,
         subject_path=subject_data['subject_path'],
@@ -647,7 +648,7 @@ def parse_subject_registered(subject_path,
         for name in sliceNames:
             subject_data['registered_images'][name] = get_tumor_boundingbox_registered(os.path.join(registered_subject_path,name),os.path.join(subject_path,modalityForLabelPath+'L',name))
 
-    print(subject_data['registered_images']['1.png'].shape)
+    #print(f"Subject data shape: {subject_data['registered_images']['1.png'].shape}")
     return subject_data
 
 def get_class_ID_subjectpath(subject):
@@ -668,7 +669,7 @@ def get_tumor_boundingbox_registered(imgpath, labelpath):
     am modality is gaussian standardized also
     '''
     orig_image = cv2.imread(imgpath)[:,:,0]
-    cv2.imwrite(f'/home/maanvi/registered_{imgpath[-5]}.png',orig_image)
+    #cv2.imwrite(f'/home/maanvi/registered_{imgpath[-5]}.png',orig_image)
     (orig_height, orig_width) = cv2.imread(imgpath)[:,:,0].shape
     image = cv2.imread(labelpath)
     image = cv2.resize(image, (orig_width, orig_height))
@@ -713,8 +714,9 @@ def get_tumor_boundingbox_registered(imgpath, labelpath):
         orig_image *= 255
     backup = orig_image[y1:y2,x1:x2]
     backup = cv2.resize(backup, (224,224),interpolation = cv2.INTER_LINEAR)
-    cv2.imwrite(f'/home/maanvi/registered_resize{imgpath[-5]}.png',backup)
+    #cv2.imwrite(f'/home/maanvi/registered_resize{imgpath[-5]}.png',backup)
     backup = tf.convert_to_tensor(backup, dtype=tf.uint8)
+    #print(backup.shape)
     return backup
 def get_exact_tumor(imgpath, labelpath):
     '''
