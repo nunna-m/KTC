@@ -1,0 +1,7 @@
+python3 -m ktc train_registered --whichos remote --modalities dc ec --method both --network oldcnn --config "configfiles/extra/data_options_registered.yaml" --max_steps 50 --filename oldcnn_boxCrop
+python3 -m ktc train_registered --whichos remote --modalities ec pc --method both --network oldcnn --config "configfiles/extra/data_options_registered.yaml" --max_steps 50 --filename oldcnn_boxCrop
+python3 -m ktc train_registered --whichos remote --modalities dc pc --method both --network oldcnn --config "configfiles/extra/data_options_registered.yaml" --max_steps 50 --filename oldcnn_boxCrop
+python3 -m ktc train_registered --whichos remote --modalities am  dc  ec --method both --network oldcnn --config "configfiles/extra/data_options_registered.yaml" --max_steps 50 --filename oldcnn_boxCrop
+python3 -m ktc train_registered --whichos remote --modalities am  dc  pc --method both --network oldcnn --config "configfiles/extra/data_options_registered.yaml" --max_steps 50 --filename oldcnn_boxCrop
+python3 -m ktc train_registered --whichos remote --modalities am  dc  tm --method both --network oldcnn --config "configfiles/extra/data_options_registered.yaml" --max_steps 50 --filename oldcnn_boxCrop
+python3 -m ktc train_registered --whichos remote --modalities am  ec  pc --method both --network oldcnn --config "configfiles/extra/data_options_registered.yaml" --max_steps 50 --filename oldcnn_boxCrop
