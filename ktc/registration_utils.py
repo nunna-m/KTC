@@ -2,6 +2,7 @@ import os
 import sys
 from pathlib import Path
 import cv2
+import numpy as np
 
 def copyFolderStructure(source, dest):
     #source: /home/maanvi/LAB/Datasets/kt_new_trainvaltest/
@@ -34,6 +35,129 @@ def getIntersectionFileNames(subject_path, modalities):
             gathered_modalities_paths[modality])
         )
     return gathered_modalities_paths[modalities[0]]
+
+def convertToMask(imgpath):
+    orig_image = cv2.imread(imgpath)[:,:,0]
+    #cv2.imwrite(f'/home/maanvi/registered_{imgpath[-5]}.png',orig_image)
+    (orig_height, orig_width) = cv2.imread(imgpath)[:,:,0].shape
+    imgpath_parts = imgpath.rsplit(os.path.sep,2)
+    imgpath_parts[1] += 'L'
+    labelpath = '/'.join(imgpath_parts)
+    image = cv2.imread(labelpath)
+    image = cv2.resize(image, (orig_width, orig_height))
+    backup = image.copy()
+    lower_red = np.array([0,0,50])
+    upper_red = np.array([0,0,255])
+    mask = cv2.inRange(image, lower_red, upper_red)
+    new_labelpath = labelpath.replace('kt_new_trainvaltest','kt_labels')
+    direc = new_labelpath[:-5]
+    os.makedirs(direc, exist_ok=True)
+    #print(direc)
+    cv2.imwrite(new_labelpath,mask)
+
+def storeImageLabelMasks():
+    modalities_file_path = '/home/maanvi/LAB/github/KidneyTumorClassification/ktc/5ModalitiesFilePaths.txt'
+    with open(modalities_file_path,'r') as fp:
+        for line in fp:
+            parts = line.rstrip().split(',')[:-1]
+            for part in parts:
+                convertToMask(part)
+
+def storeImageLabelMask_FilePaths():
+    source = Path('/home/maanvi/LAB/Datasets/kt_new_trainvaltest/')
+    dest = Path('/home/maanvi/LAB/Datasets/kt_registered_labels/')
+    allPaths = []
+    for modalitycombi in os.listdir(source):
+        modalities = modalitycombi.split('_')
+        if len(modalities) == 2:
+            for split_type in ['train','test','val']:
+                for clas in ['AML','CCRCC']:
+                    for subject in os.listdir(source/modalitycombi/split_type/clas):
+                        subject_path = str(source/modalitycombi/split_type/clas/subject)
+                        sameSlicePaths = getIntersectionFileNames(subject_path=subject_path,modalities=modalities)
+                        for sliceName in sameSlicePaths:
+                            if 'am' in modalities:
+                                modalities.remove('am')
+                                modalities = modalities + ['am']
+                            addThis = (
+                                os.path.join(subject_path,modalities[0],sliceName),
+                                os.path.join(subject_path.replace('kt_new_trainvaltest','kt_labels'),modalities[0]+'L',sliceName),
+                                os.path.join(subject_path,modalities[1],sliceName),
+                                os.path.join(subject_path.replace('kt_new_trainvaltest','kt_labels'),modalities[1]+'L',sliceName),
+                                os.path.join(dest/modalitycombi/split_type/clas/subject,sliceName)
+                            )
+                            output = ','.join(addThis)
+                            output += "\n"
+                            allPaths.append(output)
+    
+    with open('2ModalitiesFilePathsLabels.txt','w') as fp:
+        for line in allPaths:
+            fp.write(line)
+    
+
+    allPaths = []
+    for modalitycombi in os.listdir(source):
+        modalities = modalitycombi.split('_')
+        if len(modalities) == 3:
+            for split_type in ['train','test','val']:
+                for clas in ['AML','CCRCC']:
+                    for subject in os.listdir(source/modalitycombi/split_type/clas):
+                        subject_path = str(source/modalitycombi/split_type/clas/subject)
+                        sameSlicePaths = getIntersectionFileNames(subject_path=subject_path,modalities=modalities)
+                        for sliceName in sameSlicePaths:
+                            if 'am' in modalities:
+                                modalities.remove('am')
+                                modalities = modalities + ['am']
+                            addThis = (
+                                os.path.join(subject_path,modalities[0],sliceName),
+                                os.path.join(subject_path.replace('kt_new_trainvaltest','kt_labels'),modalities[0]+'L',sliceName),
+                                os.path.join(subject_path,modalities[1],sliceName),
+                                os.path.join(subject_path.replace('kt_new_trainvaltest','kt_labels'),modalities[1]+'L',sliceName),
+                                os.path.join(subject_path,modalities[2],sliceName),
+                                os.path.join(subject_path.replace('kt_new_trainvaltest','kt_labels'),modalities[2]+'L',sliceName),
+                                os.path.join(dest/modalitycombi/split_type/clas/subject,sliceName)
+                            )
+                            output = ','.join(addThis)
+                            output += "\n"
+                            allPaths.append(output)
+    
+    with open('3ModalitiesFilePathsLabels.txt','w') as fp:
+        for line in allPaths:
+            fp.write(line)
+
+    allPaths = []
+    for modalitycombi in os.listdir(source):
+        modalities = modalitycombi.split('_')
+        if len(modalities) == 5:
+            for split_type in ['train','test','val']:
+                for clas in ['AML','CCRCC']:
+                    for subject in os.listdir(source/modalitycombi/split_type/clas):
+                        subject_path = str(source/modalitycombi/split_type/clas/subject)
+                        sameSlicePaths = getIntersectionFileNames(subject_path=subject_path,modalities=modalities)
+                        for sliceName in sameSlicePaths:
+                            if 'am' in modalities:
+                                modalities.remove('am')
+                                modalities = modalities + ['am']
+                            addThis = (
+                                os.path.join(subject_path,modalities[0],sliceName),
+                                os.path.join(subject_path.replace('kt_new_trainvaltest','kt_labels'),modalities[0]+'L',sliceName),
+                                os.path.join(subject_path,modalities[1],sliceName),
+                                os.path.join(subject_path.replace('kt_new_trainvaltest','kt_labels'),modalities[1]+'L',sliceName),
+                                os.path.join(subject_path,modalities[2],sliceName),
+                                os.path.join(subject_path.replace('kt_new_trainvaltest','kt_labels'),modalities[2]+'L',sliceName),
+                                os.path.join(subject_path,modalities[3],sliceName),
+                                os.path.join(subject_path.replace('kt_new_trainvaltest','kt_labels'),modalities[3]+'L',sliceName),
+                                os.path.join(subject_path,modalities[4],sliceName),
+                                os.path.join(subject_path.replace('kt_new_trainvaltest','kt_labels'),modalities[4]+'L',sliceName),
+                                os.path.join(dest/modalitycombi/split_type/clas/subject,sliceName)
+                            )
+                            output = ','.join(addThis)
+                            output += "\n"
+                            allPaths.append(output)
+    
+    with open('5ModalitiesFilePathsLabels.txt','w') as fp:
+        for line in allPaths:
+            fp.write(line)
 
 def createPathFiles2ModalitiesJSON(source, dest):
     #source: /home/maanvi/LAB/Datasets/kt_new_trainvaltest/
@@ -152,12 +276,14 @@ def displayRegisteredImage():
 
 if __name__ == "__main__":
     source = Path('/home/maanvi/LAB/Datasets/kt_new_trainvaltest')
-    dest = Path('/home/maanvi/LAB/Datasets/kt_registered')
+    dest = Path('/home/maanvi/LAB/Datasets/kt_registered_labels')
     #copyFolderStructure(source, dest)
     #createPathFiles2ModalitiesJSON(source, dest)
     #createPathFiles3ModalitiesJSON(source, dest)
-    createPathFiles5ModalitiesJSON(source, dest)
+    #createPathFiles5ModalitiesJSON(source, dest)
     #filterRequiredPaths()
     #change_subject_path()
     #displayRegisteredImage()
+    #storeImageLabelMasks()
+    storeImageLabelMask_FilePaths()
 

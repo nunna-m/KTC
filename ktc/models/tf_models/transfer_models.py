@@ -409,17 +409,59 @@ class stackedNet(Model):
         print("x.shape=",x.shape)
         return x
     
-def define_stacked_model(model_members):
-    # i = 0
-    # for method,model in model_members.items():
-    #     for layer in model.layers:
-    #         layer.trainable = False
-    #         layer._name = 'ensemble_'+str(i+1)+'_'+layer.name
-    #     i += 1
+# def define_stacked_model(model_members):
+#     # i = 0
+#     # for method,model in model_members.items():
+#     #     for layer in model.layers:
+#     #         layer.trainable = False
+#     #         layer._name = 'ensemble_'+str(i+1)+'_'+layer.name
+#     #     i += 1
     
-    layerNum = -2
-    ensemble_visible = [model.input for model in model_members.values()]
-    ensemble_outputs = [model.layers[layerNum].output for model in model_members.values()]
+#     layerNum = -2
+#     ensemble_visible = [model.input for model in model_members.values()]
+#     ensemble_outputs = [model.layers[layerNum].output for model in model_members.values()]
+#     merge = layers.Concatenate(ensemble_outputs)
+#     hidden = layers.Dense(10, activation='relu')(merge)
+#     output = layers.Dense(2, activation='softmax')(hidden)
+#     model = Model(inputs=ensemble_visible, outputs=output)
+#     #plot_model(model, show_shapes=True, to_file='model_graph.png')
+#     model.compile(
+#         loss='categorical_crossentropy',
+#         optimizer='adam',
+#         metrics=['categorical_accuracy'],
+#     )
+#     return model
+
+class stackedNet(Model):
+    def __init__(
+        self,
+        activation='relu',
+        classifier_activation='softmax',
+        classifier_neurons=2,
+        **kargs,
+    ):
+        super().__init__(**kargs)
+        self.dense = layers.Dense(8, activation=activation)
+        self.dense = layers.Dense(20, activation=activation)
+        self.dense = layers.Dense(10, activation=activation)
+        self.classify_dense = layers.Dense(classifier_neurons, activation=classifier_activation)
+        
+    
+    @tf.function
+    def call(self, input_tensor, training=False):
+        x = self.dense(input_tensor)
+        x = self.classify_dense(x)
+        return x
+    
+def define_stacked_model(model_members):
+    for i in range(len(model_members)):
+        model = model_members[i]
+        for layer in model.layers:
+            layer.trainable = False
+            layer._name = 'ensemble_'+str(i+1)+'_'+layer.name
+    
+    ensemble_visible = [model.input for model in model_members]
+    ensemble_outputs = [model.output for model in model_members]
     merge = layers.Concatenate(ensemble_outputs)
     hidden = layers.Dense(10, activation='relu')(merge)
     output = layers.Dense(2, activation='softmax')(hidden)
