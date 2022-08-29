@@ -30,7 +30,7 @@ def train_stacked(
     Args:
         whichos: operation system linux/windows/remote
         method: either CT or MRI
-        network: which network to use (for level0 networks)
+        level_0: which network to use (for level0 networks)
         config (list[str]): config file paths (one or more) first one will be the main config and others will overwrite the main one or add to it
         max_steps (int): maximum training epochs
         filename: desired metrics filename, default is level0_level1_numberofepochs
@@ -47,6 +47,7 @@ def train_stacked(
         metrics_file_name = '{}_{}eps'.format(level_0, max_steps)
     else:
         metrics_file_name = filename
+    os.makedirs(config['data_options'][whichos]['save_path'], exist_ok=True)
     save_path = os.path.join(
         config['data_options'][whichos]['save_path'], metrics_file_name)
     data_path = os.path.join(
@@ -123,23 +124,24 @@ def train_stacked(
             verbose=0,
         )
         model.save_weights(weights_filename)
-
         x_test_numpy = []
         y_test_numpy = []
         for iter in testDS.as_numpy_iterator():
             x_test_numpy.append(iter[0])
             y_test_numpy.append(iter[1])
 
-        x_test = np.array(x_test_numpy)
-        y_test = np.array(y_test_numpy)
+        x_test = np.squeeze(np.array(x_test_numpy))
+        y_test = np.squeeze(np.array(y_test_numpy))
+        print(f'y_test.shape: {y_test.shape}')
         np.save(testdata_filename+'X.npy', x_test)
         np.save(testdata_filename+'y.npy', y_test)
 
         y_pred = np.array(model.predict(testDS))
+        print(f'y_pred.shape: {y_pred.shape}')
         np.save(preds_filename+'yhat.npy', y_pred)
         print('Saved into: %s' % weights_filename)
 
-        tp, fp, tn, fn = metrics.perf_measure(
+        tp, fp, tn, fn = metrics.perf_measure_stacked(
             y_test.argmax(axis=-1), y_pred.argmax(axis=-1))
         acc = (tp+tn) / (tp+fp+tn+fn)
         print("test acc: ", acc)
@@ -246,7 +248,6 @@ def foldwise_meta_learner(
 
     #current_fold = 0
     base_learning_rate = 0.01
-    config = load.load_config(config)
     methods = ['CT', 'MRI']
     #print("Operating System: {}".format(whichos))
     #print("Methods: {}".format(methods))
@@ -254,36 +255,38 @@ def foldwise_meta_learner(
     #level_1 = config['data_options']['network_info']['level_1']
     save_path = os.path.join(
         config['data_options'][whichos]['save_path'], level0_filename)
-    save_models_here = os.path.join(save_path, '{}CV'.format(current_fold))
+    save_models_here = os.path.join(save_path, '{}CV'.format(5))
     # weights_filename = os.path.join(save_models_here,'Fold'+current_fold,f"{level_0}_{method}",'weights/')
     # preds_filename = os.path.join(save_models_here,'Fold'+current_fold,f"{level_0}_{method}",'predictions/')
     # testdata_filename = os.path.join(save_models_here,'Fold'+current_fold,f"{level_0}_{method}",'testdata/')
 
     # ytest will be same for CT or MRI (because subset of am_dc_ec_pc_tm)
     # loading from either one is enough
+    #/home/maanvi/LAB/results/kidney_tumor/stacked830/stacked_temp/5CV/Fold0/oldcnn_CT/testdata
     test_data_path = os.path.join(
-        save_models_here, 'Fold'+current_fold, f"{level_0}_{methods[0]}", 'testdata/y.npy')
+        save_models_here, f"Fold{current_fold}", f"{level_0}_{methods[0]}", 'testdata/y.npy')
     ytest_data = np.load(test_data_path)
     pred_data = dict()
     pred_data_counts = dict()
     for met in methods:
         pred_data_path = os.path.join(
-            save_models_here, 'Fold'+current_fold, f"{level_0}_{met}", 'predictions/yhat.npy')
+            save_models_here, f"Fold{current_fold}", f"{level_0}_{met}", 'predictions/yhat.npy')
         pred_data[met] = np.load(pred_data_path)
         pred_data_counts[met] = pred_data[met].shape[0]
-        #print(met, pred_data[met].shape)
+        print(met, pred_data[met].shape)
 
     # make CT and MRI same shape
     if pred_data_counts['CT'] <= pred_data_counts['MRI']:
         pred_data['MRI'] = pred_data['MRI'][0:pred_data_counts['CT'], :]
         ytest_data = ytest_data[0:pred_data_counts['CT']]
-        #print('new MRI shape:', pred_data['MRI'].shape)
+        # print('new MRI shape:', pred_data['MRI'].shape)
     elif pred_data_counts['CT'] > pred_data_counts['MRI']:
         pred_data['CT'] = pred_data['CT'][0:pred_data_counts['MRI'], :]
         ytest_data = ytest_data[0:pred_data_counts['MRI']]
-        #print('new CT shape:', pred_data['CT'].shape)
+        # print('new CT shape:', pred_data['CT'].shape)
 
-    #print(len(pred_data['CT']), len(pred_data['MRI']))
+    
+    # print('ytest_data shape:', ytest_data.shape)
     if level_1 == 'fc':
         model = fit_stacked_model(pred_data=pred_data, methods=methods,
                                   ytest=ytest_data, max_steps=max_steps, lr=base_learning_rate)
@@ -293,15 +296,17 @@ def foldwise_meta_learner(
     yhat = stacked_prediction(
         pred_data=pred_data, methods=methods, model=model)
 
-    #print("Ytest data: {}".format(ytest_data))
-    #print("Yhat data: {}".format(yhat))
+    # print("Ytest data shape: {}".format(ytest_data.shape))
+    # print("Yhat data shape: {}".format(yhat.shape))
     sv_ytest = np.argmax(ytest_data, axis=1)
     if level_1 == 'xgb':
         sv_yhat = yhat
     else:
         sv_yhat = np.argmax(yhat, axis=1)
-    tp, fp, tn, fn = metrics.perf_measure(
-        sv_ytest.argmax(axis=-1), sv_yhat.argmax(axis=-1))
+    # print("Ytest data shape: {}".format(sv_ytest.shape))
+    # print("Yhat data shape: {}".format(sv_yhat.shape))
+    tp, fp, tn, fn = metrics.perf_measure_stacked(
+        sv_ytest, sv_yhat)
     acc = (tp+tn) / (tp+fp+tn+fn)
     print('Stacked Test Accuracy: %.3f' % acc)
     return acc
@@ -329,6 +334,8 @@ def fit_stacked_model(pred_data, methods, ytest, max_steps, lr):
         loss=tf.keras.losses.CategoricalCrossentropy(),
         metrics=['categorical_accuracy'],
     )
+    print(stackedX[0].shape)
+    print(ytest[0].shape)
     model.fit(stackedX, ytest, epochs=max_steps)
     return model
 

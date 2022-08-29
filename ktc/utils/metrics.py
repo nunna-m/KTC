@@ -31,6 +31,32 @@ def perf_measure(y_actual, y_hat):
 
     return(TP, FP, TN, FN)
 
+def perf_measure_stacked(y_actual, y_hat):
+    '''
+    Calculate True positives, False Positives, True Negatives and False Negatives from predicted labels and actual labels
+    Returns tuple of (TP, FP, TN, FN)
+    Args:
+        y_actual: actual labels (0 or 1 benign/cancerous)
+        y_hat: predicted labels (0 or 1, major class is taken based on bigger number after softmax activation)
+    '''
+    TP = 0
+    FP = 0
+    TN = 0
+    FN = 0
+    # print("y_actual: ",y_actual, len(y_actual))
+    # print("y_hat: ",y_hat, len(y_hat))
+    for i in range(len(y_hat)): 
+        if y_actual[i]==y_hat[i]==1:
+           TP += 1
+        if y_hat[i]==1 and y_actual[i]!=y_hat[i]:
+           FP += 1
+        if y_actual[i]==y_hat[i]==0:
+           TN += 1
+        if y_hat[i]==0 and y_actual[i]!=y_hat[i]:
+           FN += 1
+
+    return(TP, FP, TN, FN)
+
 def plot_roc(y_true, y_pred, path):
     '''
     plots roc curve and returns auc

@@ -5,17 +5,17 @@ data_options:
         data_path:
             /kw_resources/datasets/kt_new_trainvaltest
         save_path:
-            /kw_resources/results/kidney_tumor
+            /kw_resources/results/kidney_tumor/stacked830
     linux:
         data_path:
             /home/maanvi/LAB/Datasets/kt_new_trainvaltest
         save_path:
-            /home/maanvi/LAB/results/kidney_tumor
+            /home/maanvi/LAB/results/kidney_tumor/stacked830
     windows:
         data_path:
             D:\01_Maanvi\LABB\datasets\kt_new_trainvaltest
         save_path:
-            D:\01_Maanvi\LABB\results\kidney_tumor
+            D:\01_Maanvi\LABB\results\kidney_tumor\stacked830
     train:
         batch_size: 32
         buffer_size: 1024
