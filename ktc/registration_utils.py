@@ -285,5 +285,5 @@ if __name__ == "__main__":
     #change_subject_path()
     #displayRegisteredImage()
     #storeImageLabelMasks()
-    storeImageLabelMask_FilePaths()
+    #storeImageLabelMask_FilePaths()
 
