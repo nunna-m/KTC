@@ -628,18 +628,12 @@ def parse_subject_registered(subject_path,
     '''
     registered_subject_path = subject_path.replace('kt_new_trainvaltest','kt_registered')
     registered_subject_path_label = subject_path.replace('kt_new_trainvaltest','kt_registered_labels')
+    #print(registered_subject_path_label)
     subject_data = {'subject_path': subject_path, 'registered_subject_path': registered_subject_path}
     
     subject_data['clas'], subject_data['ID'] = get_class_ID_subjectpath(subject_path)
     sliceNames = os.listdir(registered_subject_path)
     subject_data['num_slices_per_modality']=len(sliceNames)
-    #newPath = '/home/maanvi/LAB/Datasets/kt_registered/ec_tm/train/AML/16639185'
-    hereModalities = registered_subject_path.rsplit(os.path.sep,4)[1].split('_')
-
-    if 'am' in modalities:
-        modalityForLabelPath = 'am'
-    else:
-        modalityForLabelPath = hereModalities[-1]
 
     subject_data['registered_images'] = dict()
     if tumor_region_only:
@@ -684,6 +678,7 @@ def get_exact_tumor_registered(imgpath, labelpath):
         orig_image *= 255
     #cv2.imwrite('/home/maanvi/Desktop/mask.png',mask)
     ret, thresh1 = cv2.threshold(mask, 0, 255, cv2.THRESH_BINARY)
+    print(thresh1.shape)
     orig_image[thresh1==0] = 0
     out = np.zeros_like(orig_image)
     out[mask == 255] = orig_image[mask == 255]
@@ -693,7 +688,7 @@ def get_exact_tumor_registered(imgpath, labelpath):
     (bottomy, bottomx) = (np.max(y), np.max(x))
     out = out[topy:bottomy+1, topx:bottomx+1]
     out = cv2.resize(out, (224,224), interpolation=cv2.INTER_CUBIC)
-    #cv2.imwrite(f'/home/maanvi/registered_resize_exact{imgpath[-5]}.png',out)
+    cv2.imwrite(f'/home/maanvi/registered_resize_exact{imgpath[-5]}.png',out)
     out = tf.convert_to_tensor(out, dtype=tf.uint8)
     return out
 
@@ -1188,7 +1183,7 @@ def count(ds):
     return size
 
 
-# print(parse_subject_registered('/home/maanvi/LAB/Datasets/kt_new_trainvaltest/am_ec/train/CCRCC/16269495', 
+# print(parse_subject_registered('/home/maanvi/LAB/Datasets/kt_new_trainvaltest/am_tm/train/CCRCC/16659607', 
 #                     (224,224), 
 #                     ('ec','tm'),
-#                     tumor_region_only=False,))
+#                     tumor_region_only=True,))
