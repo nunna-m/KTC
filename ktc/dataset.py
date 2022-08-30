@@ -520,7 +520,7 @@ def combine_modalities_registered(subject, output_size, modalities, tumor_region
     if isinstance(subject, str): pass
     elif isinstance(subject, tf.Tensor): subject = subject.numpy().decode()
     else: raise NotImplementedError
-    subject_data = parse_subject_registered(subject, output_size, modalities=modalities, tumor_region_only=False)
+    subject_data = parse_subject_registered(subject, output_size, modalities=modalities, tumor_region_only=tumor_region_only)
     slice_names = subject_data['registered_images'].keys()
     assert len(modalities) > 1
     images = []
@@ -627,6 +627,7 @@ def parse_subject_registered(subject_path,
         tumor_region_only (bool): true indicates cropping to a pixel perfect region false: rectangular box around the tumor region
     '''
     registered_subject_path = subject_path.replace('kt_new_trainvaltest','kt_registered')
+    registered_subject_path_label = subject_path.replace('kt_new_trainvaltest','kt_registered_labels')
     subject_data = {'subject_path': subject_path, 'registered_subject_path': registered_subject_path}
     
     subject_data['clas'], subject_data['ID'] = get_class_ID_subjectpath(subject_path)
@@ -643,10 +644,10 @@ def parse_subject_registered(subject_path,
     subject_data['registered_images'] = dict()
     if tumor_region_only:
         for name in sliceNames:
-            subject_data['registered_images'][name] = get_exact_tumor(os.path.join(registered_subject_path,name),os.path.join(subject_path,modalityForLabelPath+'L',name))
+            subject_data['registered_images'][name] = get_exact_tumor_registered(os.path.join(registered_subject_path,name),os.path.join(registered_subject_path_label,name))
     else:
         for name in sliceNames:
-            subject_data['registered_images'][name] = get_tumor_boundingbox_registered(os.path.join(registered_subject_path,name),os.path.join(subject_path,modalityForLabelPath+'L',name))
+            subject_data['registered_images'][name] = get_tumor_boundingbox_registered(os.path.join(registered_subject_path,name),os.path.join(registered_subject_path_label,name))
 
     #print(f"Subject data shape: {subject_data['registered_images']['1.png'].shape}")
     return subject_data
@@ -661,6 +662,41 @@ def get_class_ID_subjectpath(subject):
     assert clas in ('AML', 'CCRCC'), f'Classification category{clas} extracted from : {subject} unknown'
     return clas, ID
 
+def get_exact_tumor_registered(imgpath, labelpath):
+    '''
+    get the exact segmented tumor region (pixel perfect) based on label already provided
+    '''
+    orig_image = cv2.imread(imgpath)[:,:,0]
+    (orig_height, orig_width) = orig_image.shape
+    #cv2.imwrite(f'/home/maanvi/registered_{imgpath[-5]}.png',orig_image)
+    mask = cv2.imread(labelpath)[:,:,0]
+    # print(labelpath)
+    # print(f'Mask.shape: {mask.shape}')
+    # print(f'Image shape: {(orig_height,orig_width)}')
+    #gaussian standardizes only modality am
+    tmp = imgpath.rsplit(os.path.sep,2)[1]
+    if tmp=='am':
+        mean, std = orig_image.mean(), orig_image.std()
+        orig_image = (orig_image - mean)/std
+        mean, std = orig_image.mean(), orig_image.std()
+        orig_image = np.clip(orig_image, -1.0, 1.0)
+        orig_image = (orig_image + 1.0) / 2.0
+        orig_image *= 255
+    #cv2.imwrite('/home/maanvi/Desktop/mask.png',mask)
+    ret, thresh1 = cv2.threshold(mask, 0, 255, cv2.THRESH_BINARY)
+    orig_image[thresh1==0] = 0
+    out = np.zeros_like(orig_image)
+    out[mask == 255] = orig_image[mask == 255]
+    #crop out
+    (y, x) = np.where(mask == 255)
+    (topy, topx) = (np.min(y), np.min(x))
+    (bottomy, bottomx) = (np.max(y), np.max(x))
+    out = out[topy:bottomy+1, topx:bottomx+1]
+    out = cv2.resize(out, (224,224), interpolation=cv2.INTER_CUBIC)
+    #cv2.imwrite(f'/home/maanvi/registered_resize_exact{imgpath[-5]}.png',out)
+    out = tf.convert_to_tensor(out, dtype=tf.uint8)
+    return out
+
 def get_tumor_boundingbox_registered(imgpath, labelpath):
     '''
     get the bounding box coordinates around tumor
@@ -671,18 +707,13 @@ def get_tumor_boundingbox_registered(imgpath, labelpath):
     orig_image = cv2.imread(imgpath)[:,:,0]
     #cv2.imwrite(f'/home/maanvi/registered_{imgpath[-5]}.png',orig_image)
     (orig_height, orig_width) = cv2.imread(imgpath)[:,:,0].shape
-    image = cv2.imread(labelpath)
-    image = cv2.resize(image, (orig_width, orig_height))
-    backup = image.copy()
-    lower_red = np.array([0,0,50])
-    upper_red = np.array([0,0,255])
-    mask = cv2.inRange(image, lower_red, upper_red)
+    mask = cv2.imread(labelpath)[:,:,0]
     contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2. CHAIN_APPROX_NONE)
     c = max(contours, key=cv2.contourArea)
     x, y, w, h = cv2.boundingRect(c)
     assert (w,h)<(224,224)
     assert (x,y)>=(0,0)
-    const = 0.8
+    const = 0.3
     diff_x = int(const*w)
     diff_y = int(const*h)
     if (x-diff_x)<0:
