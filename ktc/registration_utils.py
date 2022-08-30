@@ -66,39 +66,39 @@ def storeImageLabelMasks():
 def storeImageLabelMask_FilePaths():
     source = Path('/home/maanvi/LAB/Datasets/kt_new_trainvaltest/')
     dest = Path('/home/maanvi/LAB/Datasets/kt_registered_labels/')
-    allPaths = []
-    for modalitycombi in os.listdir(source):
-        modalities = modalitycombi.split('_')
-        if len(modalities) == 2:
-            for split_type in ['train','test','val']:
-                for clas in ['AML','CCRCC']:
-                    for subject in os.listdir(source/modalitycombi/split_type/clas):
-                        subject_path = str(source/modalitycombi/split_type/clas/subject)
-                        sameSlicePaths = getIntersectionFileNames(subject_path=subject_path,modalities=modalities)
-                        for sliceName in sameSlicePaths:
-                            if 'am' in modalities:
-                                modalities.remove('am')
-                                modalities = modalities + ['am']
-                            addThis = (
-                                os.path.join(subject_path,modalities[0],sliceName),
-                                os.path.join(subject_path.replace('kt_new_trainvaltest','kt_labels'),modalities[0]+'L',sliceName),
-                                os.path.join(subject_path,modalities[1],sliceName),
-                                os.path.join(subject_path.replace('kt_new_trainvaltest','kt_labels'),modalities[1]+'L',sliceName),
-                                os.path.join(dest/modalitycombi/split_type/clas/subject,sliceName)
-                            )
-                            output = ','.join(addThis)
-                            output += "\n"
-                            allPaths.append(output)
+    # allPaths = []
+    # for modalitycombi in os.listdir(source):
+    #     modalities = modalitycombi.split('_')
+    #     if len(modalities) == 2:
+    #         for split_type in ['train','test','val']:
+    #             for clas in ['AML','CCRCC']:
+    #                 for subject in os.listdir(source/modalitycombi/split_type/clas):
+    #                     subject_path = str(source/modalitycombi/split_type/clas/subject)
+    #                     sameSlicePaths = getIntersectionFileNames(subject_path=subject_path,modalities=modalities)
+    #                     for sliceName in sameSlicePaths:
+    #                         if 'am' in modalities:
+    #                             modalities.remove('am')
+    #                             modalities = modalities + ['am']
+    #                         addThis = (
+    #                             os.path.join(subject_path,modalities[0],sliceName),
+    #                             os.path.join(subject_path.replace('kt_new_trainvaltest','kt_labels'),modalities[0]+'L',sliceName),
+    #                             os.path.join(subject_path,modalities[1],sliceName),
+    #                             os.path.join(subject_path.replace('kt_new_trainvaltest','kt_labels'),modalities[1]+'L',sliceName),
+    #                             os.path.join(dest/modalitycombi/split_type/clas/subject,sliceName)
+    #                         )
+    #                         output = ','.join(addThis)
+    #                         output += "\n"
+    #                         allPaths.append(output)
     
-    with open('2ModalitiesFilePathsLabels.txt','w') as fp:
-        for line in allPaths:
-            fp.write(line)
+    # with open('2ModalitiesFilePathsLabels.txt','w') as fp:
+    #     for line in allPaths:
+    #         fp.write(line)
     
 
     allPaths = []
     for modalitycombi in os.listdir(source):
         modalities = modalitycombi.split('_')
-        if len(modalities) == 3:
+        if modalities == ['am','dc','ec'] or modalities == ['am','dc','tm']:#if len(modalities) == 3:
             for split_type in ['train','test','val']:
                 for clas in ['AML','CCRCC']:
                     for subject in os.listdir(source/modalitycombi/split_type/clas):
@@ -121,43 +121,43 @@ def storeImageLabelMask_FilePaths():
                             output += "\n"
                             allPaths.append(output)
     
-    with open('3ModalitiesFilePathsLabels.txt','w') as fp:
+    with open('3ModalitiesFilePathsLabelsReduced.txt','w') as fp:
         for line in allPaths:
             fp.write(line)
 
-    allPaths = []
-    for modalitycombi in os.listdir(source):
-        modalities = modalitycombi.split('_')
-        if len(modalities) == 5:
-            for split_type in ['train','test','val']:
-                for clas in ['AML','CCRCC']:
-                    for subject in os.listdir(source/modalitycombi/split_type/clas):
-                        subject_path = str(source/modalitycombi/split_type/clas/subject)
-                        sameSlicePaths = getIntersectionFileNames(subject_path=subject_path,modalities=modalities)
-                        for sliceName in sameSlicePaths:
-                            if 'am' in modalities:
-                                modalities.remove('am')
-                                modalities = modalities + ['am']
-                            addThis = (
-                                os.path.join(subject_path,modalities[0],sliceName),
-                                os.path.join(subject_path.replace('kt_new_trainvaltest','kt_labels'),modalities[0]+'L',sliceName),
-                                os.path.join(subject_path,modalities[1],sliceName),
-                                os.path.join(subject_path.replace('kt_new_trainvaltest','kt_labels'),modalities[1]+'L',sliceName),
-                                os.path.join(subject_path,modalities[2],sliceName),
-                                os.path.join(subject_path.replace('kt_new_trainvaltest','kt_labels'),modalities[2]+'L',sliceName),
-                                os.path.join(subject_path,modalities[3],sliceName),
-                                os.path.join(subject_path.replace('kt_new_trainvaltest','kt_labels'),modalities[3]+'L',sliceName),
-                                os.path.join(subject_path,modalities[4],sliceName),
-                                os.path.join(subject_path.replace('kt_new_trainvaltest','kt_labels'),modalities[4]+'L',sliceName),
-                                os.path.join(dest/modalitycombi/split_type/clas/subject,sliceName)
-                            )
-                            output = ','.join(addThis)
-                            output += "\n"
-                            allPaths.append(output)
+    # allPaths = []
+    # for modalitycombi in os.listdir(source):
+    #     modalities = modalitycombi.split('_')
+    #     if len(modalities) == 5:
+    #         for split_type in ['train','test','val']:
+    #             for clas in ['AML','CCRCC']:
+    #                 for subject in os.listdir(source/modalitycombi/split_type/clas):
+    #                     subject_path = str(source/modalitycombi/split_type/clas/subject)
+    #                     sameSlicePaths = getIntersectionFileNames(subject_path=subject_path,modalities=modalities)
+    #                     for sliceName in sameSlicePaths:
+    #                         if 'am' in modalities:
+    #                             modalities.remove('am')
+    #                             modalities = modalities + ['am']
+    #                         addThis = (
+    #                             os.path.join(subject_path,modalities[0],sliceName),
+    #                             os.path.join(subject_path.replace('kt_new_trainvaltest','kt_labels'),modalities[0]+'L',sliceName),
+    #                             os.path.join(subject_path,modalities[1],sliceName),
+    #                             os.path.join(subject_path.replace('kt_new_trainvaltest','kt_labels'),modalities[1]+'L',sliceName),
+    #                             os.path.join(subject_path,modalities[2],sliceName),
+    #                             os.path.join(subject_path.replace('kt_new_trainvaltest','kt_labels'),modalities[2]+'L',sliceName),
+    #                             os.path.join(subject_path,modalities[3],sliceName),
+    #                             os.path.join(subject_path.replace('kt_new_trainvaltest','kt_labels'),modalities[3]+'L',sliceName),
+    #                             os.path.join(subject_path,modalities[4],sliceName),
+    #                             os.path.join(subject_path.replace('kt_new_trainvaltest','kt_labels'),modalities[4]+'L',sliceName),
+    #                             os.path.join(dest/modalitycombi/split_type/clas/subject,sliceName)
+    #                         )
+    #                         output = ','.join(addThis)
+    #                         output += "\n"
+    #                         allPaths.append(output)
     
-    with open('5ModalitiesFilePathsLabels.txt','w') as fp:
-        for line in allPaths:
-            fp.write(line)
+    # with open('5ModalitiesFilePathsLabels.txt','w') as fp:
+    #     for line in allPaths:
+    #         fp.write(line)
 
 def createPathFiles2ModalitiesJSON(source, dest):
     #source: /home/maanvi/LAB/Datasets/kt_new_trainvaltest/
@@ -191,7 +191,7 @@ def createPathFiles3ModalitiesJSON(source, dest):
     allPaths = []
     for modalitycombi in os.listdir(source):
         modalities = modalitycombi.split('_')
-        if len(modalities) == 3:
+        if modalities == ['am','dc','ec'] or modalities == ['am','dc','tm']:#if len(modalities) == 3:
             for split_type in ['train','test','val']:
                 for clas in ['AML','CCRCC']:
                     for subject in os.listdir(source/modalitycombi/split_type/clas):
@@ -211,7 +211,7 @@ def createPathFiles3ModalitiesJSON(source, dest):
                             output += "\n"
                             allPaths.append(output)
     
-    with open('3ModalitiesFilePaths.txt','w') as fp:
+    with open('3ModalitiesFilePathsReduced.txt','w') as fp:
         for line in allPaths:
             fp.write(line)
 
@@ -264,7 +264,7 @@ def change_subject_path():
     print(f'newpath: {newPath}')
 
 def displayRegisteredImage():
-    imagePath = '/home/maanvi/LAB/Datasets/kt_registered/ec_tm/train/AML/16639185/1.png'
+    imagePath = '/home/maanvi/LAB/Datasets/kt_registered/am_dc/train/CCRCC/17616386/1.png'
     image = cv2.imread(imagePath)
     print(image.shape)
     channel1 = image[:,:,0]
