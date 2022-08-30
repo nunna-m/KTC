@@ -85,6 +85,8 @@ def train_stacked(
         send_path = os.path.join(
             data_path, '{}CV'.format(cv), folds_string.format(i))
         modals = [modal for modal in modalities if modal.endswith(letter)]
+        if letter == 'c':
+            modals = ['ec']
         trainDS = dataset.train_ds(
             send_path, modals, **config['data_options']['train'])
         testDS = dataset.predict_ds(
