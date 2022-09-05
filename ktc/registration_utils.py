@@ -1,8 +1,10 @@
+from cProfile import label
 import os
 import sys
 from pathlib import Path
 import cv2
 import numpy as np
+import shutil
 
 def copyFolderStructure(source, dest):
     #source: /home/maanvi/LAB/Datasets/kt_new_trainvaltest/
@@ -274,9 +276,67 @@ def displayRegisteredImage():
     cv2.imwrite('/home/maanvi/channel2.png',channel2)
     cv2.imwrite('/home/maanvi/channel3.png',channel3)
 
+def removeSubjects():
+    source = Path('/home/maanvi/LAB/Datasets/kt_registered')
+    removesubjectsFilePath = '/home/maanvi/LAB/github/KidneyTumorClassification/ktc/remove_subjects.txt'
+    with open(removesubjectsFilePath,'r') as fp:
+        for subject in fp:
+            subject = subject.rstrip()
+            subject_path = source/subject
+            shutil.rmtree(str(subject_path))
+
+def writeRegTumorBox(imgpath,labelpath,destpath):
+    orig_image = cv2.imread(imgpath)[:,:,0]
+    (orig_height, orig_width) = orig_image.shape
+    print(imgpath)
+    mask = cv2.imread(labelpath)[:,:,0]
+    mask = cv2.resize(mask, (orig_width,orig_height),cv2.INTER_CUBIC)
+    mean, std = orig_image.mean(), orig_image.std()
+    orig_image = (orig_image - mean)/std
+    mean, std = orig_image.mean(), orig_image.std()
+    orig_image = np.clip(orig_image, -1.0, 1.0)
+    orig_image = (orig_image + 1.0) / 2.0
+    orig_image *= 255
+    ret, thresh1 = cv2.threshold(mask, 0, 255, cv2.THRESH_BINARY)
+    orig_image[thresh1==0] = 0
+    out = np.zeros_like(orig_image)
+    out[mask == 255] = orig_image[mask == 255]
+    #crop out
+    (y, x) = np.where(mask == 255)
+    (topy, topx) = (np.min(y), np.min(x))
+    (bottomy, bottomx) = (np.max(y), np.max(x))
+    out = out[topy:bottomy+1, topx:bottomx+1]
+    out = cv2.resize(out, (224,224), interpolation=cv2.INTER_CUBIC)
+    cv2.imwrite(destpath,out)
+
+def storeRegisteredCroppedImg(cropType='box'):
+    #source: /home/maanvi/LAB/Datasets/kt_registered, /home/maanvi/LAB/Datasets/kt_registered_labels
+    #dest: /home/maanvi/LAB/Datasets/kt_registered_box and /home/maanvi/LAB/Datasets/kt_registered_exact
+    dest = '/home/maanvi/LAB/Datasets/kt_registered_box'
+    img_source = Path('/home/maanvi/LAB/Datasets/kt_registered')
+    label_source = Path(str(img_source).replace('kt_registered','kt_registered_labels'))
+    for modalitycombi in os.listdir(img_source):
+        modalities = modalitycombi.split('_')
+        for split_type in ['train','test','val']:
+            for clas in ['AML','CCRCC']:
+                for subject in os.listdir(img_source/modalitycombi/split_type/clas):
+                    subject_path = str(img_source/modalitycombi/split_type/clas/subject)
+                    for img in os.listdir(img_source/modalitycombi/split_type/clas/subject):
+                        imgpath = str(img_source/modalitycombi/split_type/clas/subject/img)
+                        labelpath = str(label_source/modalitycombi/split_type/clas/subject/img)
+                        if cropType == 'box':
+                            destpath = labelpath.replace('kt_registered_labels','kt_registered_box')
+                        else:
+                            destpath = labelpath.replace('kt_registered_labels','kt_registered_exact')
+                        os.makedirs(destpath,exist_ok=True)
+                        writeRegTumorBox(imgpath,labelpath,destpath)
+                        print(destpath)
+
+
+
 if __name__ == "__main__":
-    source = Path('/home/maanvi/LAB/Datasets/kt_new_trainvaltest')
-    dest = Path('/home/maanvi/LAB/Datasets/kt_registered_labels')
+    #source = Path('/home/maanvi/LAB/Datasets/kt_new_trainvaltest')
+    #dest = Path('/home/maanvi/LAB/Datasets/kt_registered_labels')
     #copyFolderStructure(source, dest)
     #createPathFiles2ModalitiesJSON(source, dest)
     #createPathFiles3ModalitiesJSON(source, dest)
@@ -286,4 +346,6 @@ if __name__ == "__main__":
     #displayRegisteredImage()
     #storeImageLabelMasks()
     #storeImageLabelMask_FilePaths()
+    #removeSubjects()
+    storeRegisteredCroppedImg()
 
