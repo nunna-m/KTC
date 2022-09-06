@@ -4,17 +4,17 @@ data_options:
     metrics_file_name: 'vgg19_14aug_exactTumor'
     remote:
         data_path:
-            /kw_resources/datasets/kt_new_trainvaltest
+            /kw_resources/datasets/kt_registered
         save_path:
             /kw_resources/results/kidney_tumor/registered
     linux:
         data_path:
-            /home/maanvi/LAB/Datasets/kt_new_trainvaltest
+            /home/maanvi/LAB/Datasets/kt_registered
         save_path:
             /home/maanvi/LAB/results/kidney_tumor/registered
     windows:
         data_path:
-            D:\01_Maanvi\LABB\datasets\kt_new_trainvaltest
+            D:\01_Maanvi\LABB\datasets\kt_registered
         save_path:
             D:\01_Maanvi\LABB\results\kidney_tumor\registered
     train:
