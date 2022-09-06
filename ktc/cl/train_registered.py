@@ -91,7 +91,8 @@ def train_registered(
         tf.keras.backend.clear_session()
 
         num_neurons = 2 #2 classifier neurons (binary classification)
-        n_trainsteps = folders.count_total(send_path,'train')//batch_size
+        foldercountPath = send_path.replace('kt_registered','kt_new_trainvaltest')
+        n_trainsteps = folders.count_total(foldercountPath,'train')//batch_size
         if network == 'cnn':
             model = vanillacnn.CNN(classifier_activation='softmax',num_classes=num_neurons)
         elif network == 'linearcombicnn':
@@ -147,7 +148,7 @@ def train_registered(
         acc = (tp+tn) / (tp+fp+tn+fn)
         print("test acc: ",acc)           
         fold_acc.append(acc)
-        nf_aml,nf_cc = folders.count_fromFiles(send_path, 'test')
+        nf_aml,nf_cc = folders.count_fromFiles(foldercountPath, 'test')
         if os.path.isdir(save_path) and os.path.exists(save_path):
             sendpath = os.path.join(save_models_here,'Fold'+cvFold)
             os.makedirs(sendpath, exist_ok=True)

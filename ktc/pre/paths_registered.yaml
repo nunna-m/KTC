@@ -1,0 +1,20 @@
+os:
+  windows:
+    data_root:
+      'D:\01_Maanvi\LABB\datasets\kt_new'
+    after_split_path:
+      'D:\01_Maanvi\LABB\datasets\kt_registered'
+  linux:
+    data_root:
+      '/home/maanvi/LAB/Datasets/kt_new'
+    after_split_path:
+      '/home/maanvi/LAB/Datasets/kt_registered'
+  remote:
+    data_root:
+      '/kw_resources/datasets/kt_new'
+    after_split_path:
+      '/kw_resources/datasets/kt_registered'
+
+trainvaltest_percentages:
+  train: 0.7
+  val: 0.2

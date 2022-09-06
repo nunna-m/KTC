@@ -1,4 +1,5 @@
 from cProfile import label
+from genericpath import isfile
 import os
 import sys
 from pathlib import Path
@@ -283,9 +284,16 @@ def removeSubjects():
         for subject in fp:
             subject = subject.rstrip()
             subject_path = source/subject
-            shutil.rmtree(str(subject_path))
+            if os.path.isfile(subject_path):
+                os.remove(subject_path)
+                print("removing file")
+                print(subject_path)
+            elif os.path.isdir(subject_path):
+                shutil.rmtree(str(subject_path))
+                print(subject_path)
+            
 
-def writeRegTumorBox(imgpath,labelpath,destpath):
+def writeRegTumorExact(imgpath,labelpath,destpath):
     orig_image = cv2.imread(imgpath)[:,:,0]
     (orig_height, orig_width) = orig_image.shape
     print(imgpath)
@@ -309,7 +317,45 @@ def writeRegTumorBox(imgpath,labelpath,destpath):
     out = cv2.resize(out, (224,224), interpolation=cv2.INTER_CUBIC)
     cv2.imwrite(destpath,out)
 
-def storeRegisteredCroppedImg(cropType='box'):
+def writeRegTumorBox(imgpath,labelpath,destpath):
+    orig_image = cv2.imread(imgpath)[:,:,0]
+    (orig_height, orig_width) = cv2.imread(imgpath)[:,:,0].shape
+    mask = cv2.imread(labelpath)[:,:,0]
+    contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2. CHAIN_APPROX_NONE)
+    c = max(contours, key=cv2.contourArea)
+    x, y, w, h = cv2.boundingRect(c)
+    assert (w,h)<(224,224)
+    assert (x,y)>=(0,0)
+    const = 0.3
+    diff_x = int(const*w)
+    diff_y = int(const*h)
+    if (x-diff_x)<0:
+        x1 = 0
+    else:
+        x1 = x-diff_x
+    if (y-diff_y)<0:
+        y1 = 0
+    else:
+        y1 = y-diff_y
+    if (x+w+diff_x)>=orig_width:
+        x2 = orig_width
+    else:
+        x2 = x+diff_x+w
+    if (y+diff_y+h)>=orig_height:
+        y2 = orig_height
+    else:
+        y2 = y+diff_y+h
+    mean, std = orig_image.mean(), orig_image.std()
+    orig_image = (orig_image - mean)/std
+    mean, std = orig_image.mean(), orig_image.std()
+    orig_image = np.clip(orig_image, -1.0, 1.0)
+    orig_image = (orig_image + 1.0) / 2.0
+    orig_image *= 255
+    backup = orig_image[y1:y2,x1:x2]
+    backup = cv2.resize(backup, (224,224),interpolation = cv2.INTER_LINEAR)
+    cv2.imwrite(destpath,backup)
+
+def storeRegisteredCroppedImg(cropType='exact'):
     #source: /home/maanvi/LAB/Datasets/kt_registered, /home/maanvi/LAB/Datasets/kt_registered_labels
     #dest: /home/maanvi/LAB/Datasets/kt_registered_box and /home/maanvi/LAB/Datasets/kt_registered_exact
     dest = '/home/maanvi/LAB/Datasets/kt_registered_box'
@@ -326,10 +372,15 @@ def storeRegisteredCroppedImg(cropType='box'):
                         labelpath = str(label_source/modalitycombi/split_type/clas/subject/img)
                         if cropType == 'box':
                             destpath = labelpath.replace('kt_registered_labels','kt_registered_box')
+                            dest_folder_path = destpath[:-6]
+                            os.makedirs(dest_folder_path,exist_ok=True)
+                            writeRegTumorBox(imgpath,labelpath,destpath)
                         else:
                             destpath = labelpath.replace('kt_registered_labels','kt_registered_exact')
-                        os.makedirs(destpath,exist_ok=True)
-                        writeRegTumorBox(imgpath,labelpath,destpath)
+                            dest_folder_path = destpath[:-6]
+                            os.makedirs(dest_folder_path,exist_ok=True)
+                            writeRegTumorExact(imgpath,labelpath,destpath)
+                        
                         print(destpath)
 
 
@@ -347,5 +398,6 @@ if __name__ == "__main__":
     #storeImageLabelMasks()
     #storeImageLabelMask_FilePaths()
     #removeSubjects()
-    storeRegisteredCroppedImg()
+    storeRegisteredCroppedImg(cropType='box')
+    storeRegisteredCroppedImg(cropType='exact')
 

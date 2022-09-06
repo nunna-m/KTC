@@ -9,9 +9,27 @@ import numpy as np
 
 from . import trainvaltest
 
-def crossvalDataGen(whichos, path, modalities, kfolds, loocv=False):
+def crossvalFoldsFilesAllModalities(whichos, path, kfolds, loocv=False):
     '''
     Outer function to call on combining train val and test subjects. 
+    Sample_command: python -m pre crossvalDataGen --path /home/user/path_to_config --kfolds number/of/folds/to/split --whichos operating_sys
+    Args:
+        whichos: linux/windows/remote
+        path: path to the config file that has data paths
+        kfolds: number of crossvalidation folds
+        loocv (bool): generate Leave one out cross validation data
+
+    '''
+    folds = int(kfolds)
+    configs = trainvaltest.return_configs_asdict(whichos, path)
+    basepath = os.path.join(configs['os'][whichos]['after_split_path'])
+    for modalityCombi in os.listdir(basepath):
+        modalityPath = os.path.join(basepath,modalityCombi)
+        combine_train_test_val(modalityPath, kfolds=folds, loocv=loocv)
+
+def crossvalDataGenPerModality(whichos, path, modalities, kfolds, loocv=False):
+    '''
+    Outer function to call on combining train val and test subjects per modality. 
     Sample_command: python -m pre crossvalDataGen --path /home/user/path_to_config --modalities /list/of/modalities --kfolds number/of/folds/to/split --whichos operating_sys
     Args:
         whichos: linux/windows/remote

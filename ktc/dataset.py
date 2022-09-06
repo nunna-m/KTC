@@ -333,7 +333,7 @@ def load_raw_registered(traindir,
     ds = tf.data.Dataset.from_tensor_slices(training_subject_paths)
     label_ds = ds.interleave(
             partial(
-                tf_combine_labels,
+                tf_combine_labels_registered,
                 modalities=modalities,
                 return_type='dataset',
             ),
@@ -412,6 +412,26 @@ def tf_combine_labels(subject_path, modalities,return_type='array'):
         )
     else: raise NotImplementedError
 
+def tf_combine_labels_registered(subject_path, modalities,return_type='array'):
+    '''
+    outer function to stack different labels of each modality for every subject
+    '''
+    return_type  =return_type.lower()
+    modality = modalities[0]
+    if return_type == 'array':
+        return tf.py_function(
+            lambda x: partial(get_label_registered,
+            modality=modality)(x),
+            [subject_path],
+            tf.int32,
+        )
+    elif return_type == 'dataset':
+        return tf.data.Dataset.from_tensor_slices(
+            tf_combine_labels_registered(subject_path=subject_path,
+            modalities=modalities, return_type='array')
+        )
+    else: raise NotImplementedError
+
 def get_label(subject, modality):
     '''
     get label of image from file or directory name
@@ -425,6 +445,26 @@ def get_label(subject, modality):
     clas, _ = get_class_ID_subjectpath(subject)
     required_path = os.path.join(subject, modality)
     num = len([name for name in os.listdir(required_path) if os.path.isfile(os.path.join(required_path,name))])
+    num_slices = tf.constant([num], tf.int32)
+    if clas=='AML':
+        label = tf.constant([0], tf.int32)
+    elif clas=='CCRCC':
+        label = tf.constant([1], tf.int32)
+    final = tf.tile(label, num_slices)
+    return final
+
+def get_label_registered(subject, modality):
+    '''
+    get label of image from file or directory name
+    convert into number tensor and create an array of repeated label values for as many number of slices
+    '''
+    if isinstance(subject, str): 
+        pass
+    elif isinstance(subject, tf.Tensor): 
+        subject = subject.numpy().decode()
+    else: raise NotImplementedError
+    clas, _ = get_class_ID_subjectpath(subject)
+    num = len([name for name in os.listdir(subject) if os.path.isfile(os.path.join(subject,name))])
     num_slices = tf.constant([num], tf.int32)
     if clas=='AML':
         label = tf.constant([0], tf.int32)
@@ -626,8 +666,8 @@ def parse_subject_registered(subject_path,
         modalities: ct or mri or both
         tumor_region_only (bool): true indicates cropping to a pixel perfect region false: rectangular box around the tumor region
     '''
-    registered_subject_path = subject_path.replace('kt_new_trainvaltest','kt_registered')
-    registered_subject_path_label = subject_path.replace('kt_new_trainvaltest','kt_registered_labels')
+    registered_subject_path = subject_path
+    registered_subject_path_label = subject_path.replace('kt_registered','kt_registered_labels')
     #print(registered_subject_path_label)
     subject_data = {'subject_path': subject_path, 'registered_subject_path': registered_subject_path}
     
@@ -660,35 +700,37 @@ def get_exact_tumor_registered(imgpath, labelpath):
     '''
     get the exact segmented tumor region (pixel perfect) based on label already provided
     '''
-    orig_image = cv2.imread(imgpath)[:,:,0]
-    (orig_height, orig_width) = orig_image.shape
-    #cv2.imwrite(f'/home/maanvi/registered_{imgpath[-5]}.png',orig_image)
-    mask = cv2.imread(labelpath)[:,:,0]
-    # print(labelpath)
-    # print(f'Mask.shape: {mask.shape}')
-    # print(f'Image shape: {(orig_height,orig_width)}')
-    #gaussian standardizes only modality am
-    tmp = imgpath.rsplit(os.path.sep,2)[1]
-    if tmp=='am':
-        mean, std = orig_image.mean(), orig_image.std()
-        orig_image = (orig_image - mean)/std
-        mean, std = orig_image.mean(), orig_image.std()
-        orig_image = np.clip(orig_image, -1.0, 1.0)
-        orig_image = (orig_image + 1.0) / 2.0
-        orig_image *= 255
-    #cv2.imwrite('/home/maanvi/Desktop/mask.png',mask)
-    ret, thresh1 = cv2.threshold(mask, 0, 255, cv2.THRESH_BINARY)
-    print(thresh1.shape)
-    orig_image[thresh1==0] = 0
-    out = np.zeros_like(orig_image)
-    out[mask == 255] = orig_image[mask == 255]
-    #crop out
-    (y, x) = np.where(mask == 255)
-    (topy, topx) = (np.min(y), np.min(x))
-    (bottomy, bottomx) = (np.max(y), np.max(x))
-    out = out[topy:bottomy+1, topx:bottomx+1]
-    out = cv2.resize(out, (224,224), interpolation=cv2.INTER_CUBIC)
-    cv2.imwrite(f'/home/maanvi/registered_resize_exact{imgpath[-5]}.png',out)
+    #print(imgpath, labelpath)
+    # orig_image = cv2.imread(imgpath)[:,:,0]
+    # (orig_height, orig_width) = orig_image.shape
+    # #cv2.imwrite(f'/home/maanvi/registered_{imgpath[-5]}.png',orig_image)
+    # mask = cv2.imread(labelpath)[:,:,0]
+    # # print(labelpath)
+    # # print(f'Mask.shape: {mask.shape}')
+    # # print(f'Image shape: {(orig_height,orig_width)}')
+    # #gaussian standardizes only modality am
+    # mean, std = orig_image.mean(), orig_image.std()
+    # orig_image = (orig_image - mean)/std
+    # mean, std = orig_image.mean(), orig_image.std()
+    # orig_image = np.clip(orig_image, -1.0, 1.0)
+    # orig_image = (orig_image + 1.0) / 2.0
+    # orig_image *= 255
+    # #cv2.imwrite('/home/maanvi/Desktop/mask.png',mask)
+    # ret, thresh1 = cv2.threshold(mask, 0, 255, cv2.THRESH_BINARY)
+    # #print(thresh1.shape)
+    # orig_image[thresh1==0] = 0
+    # out = np.zeros_like(orig_image)
+    # out[mask == 255] = orig_image[mask == 255]
+    # #crop out
+    # #print(np.where(mask==255))
+    # (y, x) = np.where(mask == 255)
+    # (topy, topx) = (np.min(y), np.min(x))
+    # (bottomy, bottomx) = (np.max(y), np.max(x))
+    # out = out[topy:bottomy+1, topx:bottomx+1]
+    # out = cv2.resize(out, (224,224), interpolation=cv2.INTER_CUBIC)
+    #cv2.imwrite(f'/home/maanvi/registered_resize_exact{imgpath[-5]}.png',out)
+    new_path = imgpath.replace('kt_registered','kt_registered_exact')
+    out = cv2.imread(new_path)[:,:,0]
     out = tf.convert_to_tensor(out, dtype=tf.uint8)
     return out
 
