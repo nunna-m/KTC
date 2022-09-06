@@ -1,0 +1,1 @@
+python -m pre crossvalFoldsFilesAllModalities --path ktc/pre/paths_registered.yaml --kfolds 5 --whichos remote
