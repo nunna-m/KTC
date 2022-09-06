@@ -412,7 +412,8 @@ if __name__ == "__main__":
     #displayRegisteredImage()
     #storeImageLabelMasks()
     #storeImageLabelMask_FilePaths()
-    removeSubjects()
+    #removeSubjects()
+    removeSubjectsRemote()
     #storeRegisteredCroppedImg(cropType='box')
     #storeRegisteredCroppedImg(cropType='exact')
 
