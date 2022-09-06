@@ -291,6 +291,21 @@ def removeSubjects():
             elif os.path.isdir(subject_path):
                 shutil.rmtree(str(subject_path))
                 print(subject_path)
+
+def removeSubjectsRemote():
+    source = Path('/kw_resources/datasets/kt_registered')
+    removesubjectsFilePath = '/kw_resources/remove_subjects.txt'
+    with open(removesubjectsFilePath,'r') as fp:
+        for subject in fp:
+            subject = subject.rstrip()
+            subject_path = source/subject
+            if os.path.isfile(subject_path):
+                os.remove(subject_path)
+                print("removing file")
+                print(subject_path)
+            elif os.path.isdir(subject_path):
+                shutil.rmtree(str(subject_path))
+                print(subject_path)
             
 
 def writeRegTumorExact(imgpath,labelpath,destpath):
@@ -397,7 +412,7 @@ if __name__ == "__main__":
     #displayRegisteredImage()
     #storeImageLabelMasks()
     #storeImageLabelMask_FilePaths()
-    #removeSubjects()
-    storeRegisteredCroppedImg(cropType='box')
-    storeRegisteredCroppedImg(cropType='exact')
+    removeSubjects()
+    #storeRegisteredCroppedImg(cropType='box')
+    #storeRegisteredCroppedImg(cropType='exact')
 
