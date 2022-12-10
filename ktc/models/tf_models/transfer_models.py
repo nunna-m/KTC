@@ -146,6 +146,16 @@ class alex_net(Model):
 
         return x
 
+class vgg16_pretrained_medmnist(Model):
+    def __init__(
+        self,
+        activation='relu',
+        classifier_activation='softmax',
+        classifier_neurons=2,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        
 class vgg16_net(Model):
     def __init__(
         self,
