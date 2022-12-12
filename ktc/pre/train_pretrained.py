@@ -22,3 +22,5 @@ tf_rep = prepare(model)
 
 output = tf_rep.run(np.asarray(test_image1,dtype=np.float32)[np.newaxis,:,:,:])
 print(output)
+
+tf_rep.export_graph('/home/maanvi/LAB/code/vgg16_pretrained.pb')
