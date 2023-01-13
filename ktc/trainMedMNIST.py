@@ -67,6 +67,9 @@ def format_example(image, label):
 
 normalization_layer = tf.keras.layers.experimental.preprocessing.Rescaling(1./127.5, offset=-1)
 
+print('Using GPU---------')
+print(tf.config.list_physical_devices('GPU'))
+print('*********************')
 train_dataset = tf.data.Dataset.from_tensor_slices((train_data, train_labels))
 train_dataset = train_dataset.map(format_example)
 train_dataset = train_dataset.map(lambda x,y:(normalization_layer(x),y))
