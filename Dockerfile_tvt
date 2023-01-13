@@ -5,3 +5,15 @@ RUN git clone https://github.com/nunna-m/KidneyTumorClassification
 WORKDIR KidneyTumorClassification
 RUN pip3 install -r requirements.txt
 ENTRYPOINT ["bash", "/KidneyTumorClassification/bash/crossval_remote.sh"]
+
+vgg16-med-100ep(20.04)
+
+FROM nvidia/cuda:11.2.1-cudnn8-devel-ubuntu20.04
+RUN apt-get update
+RUN apt-get install -y python3 python3-pip git
+RUN apt install -y libgl1-mesa-glx
+RUN git clone https://github.com/nunna-m/KidneyTumorClassification
+WORKDIR KidneyTumorClassification
+RUN pip install --upgrade pip setuptools wheel
+RUN pip install -r requirements.txt
+ENTRYPOINT ["python3", "/KidneyTumorClassification/ktc/trainMedMNIST.py","/kw_resources/datasets/organamnist.npz","/kw_resources/pre_trained_models/vgg16_plain/cp.ckpt"]
