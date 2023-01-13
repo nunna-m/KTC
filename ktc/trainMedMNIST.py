@@ -108,7 +108,7 @@ cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,
 
 model.fit(train_dataset, 
           validation_data=val_dataset,
-          epochs=2,
+          epochs=100,
           callbacks=[cp_callback])
 
 # vgg_model = tf.keras.applications.VGG16(input_shape=(224, 224, 3))
