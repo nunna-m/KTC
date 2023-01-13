@@ -8,7 +8,7 @@ protobuf
 regex
 pandas
 tqdm
-opencv-python
+opencv-python==4.5.1
 p_tqdm
 pyyaml
 tensorboard_plugin_profile
