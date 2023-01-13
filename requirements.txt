@@ -1,5 +1,5 @@
 tensorflow==2.4.0
-git+ssh://git@github.com/yoshihikoueno/dsargparse.git
+git+https://github.com/yoshihikoueno/dsargparse.git@master
 numpy==1.19.2
 connected-components-3d
 tensorflow-addons
