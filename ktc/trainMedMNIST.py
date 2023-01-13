@@ -45,17 +45,14 @@ data = np.load('/home/maanvi/LAB/code/organamnist.npz', allow_pickle=True)
 #print(list(data.keys()))
 train_data = data['train_images']
 train_labels = data['train_labels']
-class_labels = list(np.unique(data['train_labels']))
-train_labels = to_categorical(train_labels, len(class_labels))
 #print(f'Train data shape: {train_data.shape}')
 val_data = data['val_images']
 val_labels = data['val_labels']
-val_labels = to_categorical(val_labels,len(class_labels))
 #print(f'Val data shape: {val_data.shape}')
 test_data = data['test_images']
 test_labels = data['test_labels']
-test_labels = to_categorical(test_labels,len(class_labels))
 #print(f'Test data shape: {test_data.shape}')
+class_labels = list(np.unique(data['train_labels']))
 
 def format_example(image, label):
     image = tf.cast(image, tf.float32)
@@ -89,27 +86,23 @@ for image_batch, label_batch in train_dataset.take(2):
     print(label_batch.shape)
     break
 
+# model = tf.keras.Sequential([
+#   tf.keras.layers.Conv2D(32, 3, activation='relu',input_shape=(224,224,3)),
+#   tf.keras.layers.MaxPooling2D(),
+#   tf.keras.layers.Conv2D(32, 3, activation='relu'),
+#   tf.keras.layers.MaxPooling2D(),
+#   tf.keras.layers.Conv2D(32, 3, activation='relu'),
+#   tf.keras.layers.MaxPooling2D(),
+#   tf.keras.layers.Flatten(),
+#   tf.keras.layers.Dense(128, activation='relu'),
+#   tf.keras.layers.Dense(len(class_labels))
+# ])
 model = VGG16(num_classes=len(class_labels))
 
-model.compile(optimizer=tf.keras.optimizers.Adam(),
-              loss=tf.keras.losses.CategoricalCrossentropy(),
-              metrics=['accuracy'])
-
-
-
-checkpoint_dir = os.path.dirname(checkpoint_path)
-
-#Create a callback that saves the model weights
-cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,
-                                                 save_weights_only=True,
-                                                 save_best_only=True,
-                                                 verbose=1)
+model.compile(optimizer=tf.keras.optimizers.RMSprop(),
+              loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+              metrics=['sparse_categorical_accuracy'])
 
 model.fit(train_dataset, 
           validation_data=val_dataset,
-          epochs=2,
-          callbacks=[cp_callback])
-
-# vgg_model = tf.keras.applications.VGG16(input_shape=(224, 224, 3))
-# for layer in model.layers:
-#     print(layer.name)
+          epochs=10)
