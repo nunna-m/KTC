@@ -1,4 +1,4 @@
-#sample command: python trainMedMNIST.py /home/maanvi/LAB/pre_trained_models/vgg16_plain/cp.ckpt
+#sample command: python trainMedMNIST.py /home/maanvi/LAB/code/organamnist.npz /home/maanvi/LAB/pre_trained_models/vgg16_plain/cp.ckpt
 import cv2
 import sys
 import numpy as np
@@ -40,8 +40,9 @@ def VGG16(num_classes):
     model.add(Dense(num_classes, activation='sigmoid', name='predictions'))
     return model
 
-checkpoint_path = sys.argv[1]
-data = np.load('/home/maanvi/LAB/code/organamnist.npz', allow_pickle=True)
+checkpoint_path = sys.argv[2]
+dataset_path = sys.argv[1]
+data = np.load(dataset_path, allow_pickle=True)
 #print(list(data.keys()))
 train_data = data['train_images']
 train_labels = data['train_labels']
