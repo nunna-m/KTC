@@ -8,6 +8,7 @@ protobuf
 regex
 pandas
 tqdm
+simpleitk
 opencv-python==4.5.1.48
 p_tqdm
 pyyaml
