@@ -1,6 +1,7 @@
 #%%
 import SimpleITK as sitk
 import cv2
+import os
 import numpy as np
 #OUTPUT_DIR = '/home/maanvi/LAB/Output'
 OUTPUT_DIR = 'D:/01_Maanvi/LABB/simpleitk_output'
@@ -81,19 +82,21 @@ def update_multires_iterations():
     global metric_values, multires_iterations
     multires_iterations.append(len(metric_values))
 # %%
-fixed_image_path = 'D:/01_Maanvi/LABB/datasets/kt_new_trainvaltest/dc_pc/train/AML/15630104/dc/1.png'
-moving_image_path = 'D:/01_Maanvi/LABB/datasets/kt_new_trainvaltest/dc_pc/train/AML/15630104/pc/1.png'
-fixed_arr = np.array(cv2.cvtColor(cv2.imread(fixed_image_path),cv2.COLOR_BGR2RGB))
-moving_arr = np.array(cv2.cvtColor(cv2.imread(moving_image_path),cv2.COLOR_BGR2RGB))
+moving_image_path = 'D:/01_Maanvi/LABB/datasets/kt_new_trainvaltest/dc_pc/train/AML/15630104/dc/1.png'
+fixed_image_path = 'D:/01_Maanvi/LABB/datasets/kt_new_trainvaltest/dc_pc/train/AML/15630104/pc/1.png'
+fixed_arr = np.array(cv2.cvtColor(cv2.imread(fixed_image_path),cv2.COLOR_BGR2RGB))[:,:,0]
+moving_arr = np.array(cv2.cvtColor(cv2.imread(moving_image_path),cv2.COLOR_BGR2RGB))[:,:,0]
 print(fixed_arr.shape)
 
 #%%
-sitk.Show(sitk.ReadImage(fixed_image_path,imageIO="PNGImageIO"))
+#sitk.Show(sitk.ReadImage(fixed_image_path,imageIO="PNGImageIO"))
 #%%
 use_affine = False
 fixed_image = sitk.GetImageFromArray(fixed_arr)
 moving_image = sitk.GetImageFromArray(moving_arr)
 transform = sitk.AffineTransform(2) if use_affine else sitk.ScaleTransform(2)
+# transform_to_displacment_field_filter = sitk.TransformToDisplacementFieldFilter()
+# initial_transform = sitk.DisplacementFieldTransform(transform_to_displacment_field_filter.Execute(sitk.Transform(2,sitk.sitkIdentity)))
 initial_transform = sitk.CenteredTransformInitializer(sitk.Cast(fixed_image, moving_image.GetPixelID()),moving_image,transform,sitk.CenteredTransformInitializerFilter.GEOMETRY)
 ff_img = sitk.Cast(fixed_image, sitk.sitkFloat32)
 mv_img = sitk.Cast(moving_image, sitk.sitkFloat32)
@@ -120,4 +123,27 @@ resample.SetReferenceImage(fixed_image)
 resample.SetInterpolator(sitk.sitkBSpline)
 resample.SetTransform(final_transform_v1)
 resample.Execute(moving_image)
+final_transform = registration_method.Execute(
+    sitk.Cast(fixed_image, sitk.sitkFloat32), sitk.Cast(moving_image, sitk.sitkFloat32)
+)
+# %%
+moving_resampled = sitk.Resample(
+    moving_image,
+    fixed_image,
+    final_transform,
+    sitk.sitkLinear,
+    0.0,
+    moving_image.GetPixelID(),
+)
+os.makedirs(OUTPUT_DIR,exist_ok=True)
+sitk.WriteImage(moving_resampled, os.path.join(OUTPUT_DIR, 'AML_15630104_dc-pc_1.png'))
+sitk.WriteTransform(final_transform, os.path.join(OUTPUT_DIR, 'AML_15630104_dc-pc_1.tfm'))
+#%%
+# interact(
+#     display_images_with_alpha,
+#     image_z=(0, fixed_image.GetSize()[2] - 1),
+#     alpha=(0.0, 1.0, 0.05),
+#     fixed=fixed(fixed_image),
+#     moving=fixed(moving_resampled),
+# );
 # %%
