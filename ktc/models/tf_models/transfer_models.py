@@ -189,6 +189,52 @@ class vgg16_pretrained_medmnist(Model):
         x = self.dropout(x)
         x = self.dense3(x)
         return x
+
+class vgg16_pretrained_medmnist_lblck(Model):
+    def __init__(
+        self,
+        activation='relu',
+        classifier_activation='softmax',
+        classifier_neurons=2,
+        checkpoint_path='/home/maanvi/LAB/github/KidneyTumorClassification/ktc/training_ep1/cp.ckpt',
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self.vgg_medmnist_model = tf.keras.Sequential([
+                tf.keras.applications.VGG16(input_shape=(224,224,3),include_top=False),
+                tf.keras.layers.Flatten(name='flatten'),
+                tf.keras.layers.Dense(256, activation='relu', name='fc1'),
+                tf.keras.layers.Dense(128, activation='relu', name='fc2'),
+                tf.keras.layers.Dense(11, activation='softmax', name='predictions')
+                ])
+        self.vgg_medmnist_model.load_weights(checkpoint_path).expect_partial()
+        # # self.vgg_medmnist_model_last_layer = self.vgg_medmnist_model.get_layer('vgg16').output
+        # self.base_model = tf.keras.models.Model(inputs=self.vgg_medmnist_model.input,outputs=self.vgg_medmnist_model.layers[-5].output)
+        self.base_model = keras.Sequential()
+        for layer in self.vgg_medmnist_model.layers:
+            if layer.name == 'flatten':
+                break
+            self.base_model.add(layer)
+        for self.layer in self.base_model.layers[:15]:
+            self.layer.trainable = False
+        for self.layer in self.base_model.layers[15:]:
+            self.layer.trainable = True
+        self.gap = layers.GlobalAveragePooling2D()
+        self.dense1 = layers.Dense(512, activation=activation)
+        self.dropout = layers.Dropout(0.2)
+        self.dense2 = layers.Dense(256, activation=activation)
+        self.dense3 = layers.Dense(classifier_neurons, activation=classifier_activation)
+        self.input_layer = layers.InputLayer(input_shape=(224,224,3))
+    
+    @tf.function
+    def call(self, input_tensor, training=False):
+        x = self.base_model(input_tensor)
+        x = self.gap(x)
+        x = self.dense1(x)
+        x = self.dense2(x)
+        x = self.dropout(x)
+        x = self.dense3(x)
+        return x
         
 class vgg16_net(Model):
     def __init__(

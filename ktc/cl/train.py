@@ -106,6 +106,8 @@ def train(
             model = transfer_models.vgg16_net_lastblocktrain(classifier_activation='softmax')
         elif network == 'vgg16_pretrained_medmnist':
             model = transfer_models.vgg16_pretrained_medmnist(classifier_activation='softmax',checkpoint_path=checkpoint_path)
+        elif network == 'vgg16_pretrained_medmnist_lblck':
+            model = transfer_models.vgg16_pretrained_medmnist(classifier_activation='softmax',checkpoint_path=checkpoint_path)
         elif network == 'vgg19':
             model = transfer_models.vgg19_net(classifier_activation='softmax')
         elif network == 'vgg19_lastblocktrain':
