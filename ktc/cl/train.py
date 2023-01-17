@@ -21,6 +21,7 @@ def train(
     network,
     config,
     max_steps,
+    checkpoint_path=None,
     filename=None,
 ):
     '''
@@ -34,6 +35,7 @@ def train(
         network: which network to use
         config (list[str]): config file paths (one or more) first one will be the main config and others will overwrite the main one or add to it
         max_steps (int): maximum training epochs
+        checkpoint_path: path of pretrained model if performing transfer learning on custom trained model
         filename: desired metrics filename, default is numAug_network_numberofepochs
     '''
     config = load.load_config(config)
@@ -102,6 +104,8 @@ def train(
             model = transfer_models.vgg16_net_last2train(classifier_activation='softmax')
         elif network == 'vgg16_lastblocktrain':
             model = transfer_models.vgg16_net_lastblocktrain(classifier_activation='softmax')
+        elif network == 'vgg16_pretrained_medmnist':
+            model = transfer_models.vgg16_pretrained_medmnist(classifier_activation='softmax',checkpoint_path=checkpoint_path)
         elif network == 'vgg19':
             model = transfer_models.vgg19_net(classifier_activation='softmax')
         elif network == 'vgg19_lastblocktrain':

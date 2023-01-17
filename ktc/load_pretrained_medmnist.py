@@ -82,7 +82,7 @@ test_dataset = tf.data.Dataset.from_tensor_slices((test_data, test_labels))
 test_dataset = test_dataset.map(format_example)
 test_dataset = test_dataset.map(lambda x,y:(normalization_layer(x),y))
 
-BATCH_SIZE = 64
+BATCH_SIZE = 32
 SHUFFLE_BUFFER_SIZE = 100
 train_dataset = train_dataset.shuffle(SHUFFLE_BUFFER_SIZE).batch(BATCH_SIZE)
 val_dataset = val_dataset.shuffle(SHUFFLE_BUFFER_SIZE).batch(BATCH_SIZE)
@@ -94,34 +94,56 @@ for image_batch, label_batch in train_dataset.take(2):
     break
 
 #model = VGG16(num_classes=len(class_labels))
-vgg16_pretrained_model = tf.keras.applications.VGG16(input_shape=(224,224,3),include_top=False,weights='imagenet')
+# vgg16_pretrained_model = tf.keras.applications.VGG16(input_shape=(224,224,3),include_top=True,weights='imagenet')
+# print(vgg16_pretrained_model.summary())
+# vgg16_pretrained_model.load_weights('/home/maanvi/LAB/pre_trained_models/vgg16_imgnet/cp.ckpt')
+
+#vgg16_pretrained_model = tf.keras.applications.VGG16(input_shape=(224,224,3),include_top=False,weights='imagenet')
+#print(vgg16_pretrained_model.summary())
 #global_average_layer = tf.keras.layers.GlobalAveragePooling2D()
 #prediction_layer = tf.keras.layers.Dense(len(class_labels),activation='softmax')
 model = tf.keras.Sequential([
-  vgg16_pretrained_model,
-  tf.keras.layers.Flatten(name='flatten'),
-  tf.keras.layers.Dense(256, activation='relu', name='fc1'),
-  tf.keras.layers.Dense(128, activation='relu', name='fc2'),
-  tf.keras.layers.Dense(len(class_labels), activation='softmax', name='predictions')
+    tf.keras.applications.VGG16(input_shape=(224,224,3),include_top=False),
+    tf.keras.layers.Flatten(name='flatten'),
+    tf.keras.layers.Dense(256, activation='relu', name='fc1'),
+    tf.keras.layers.Dense(128, activation='relu', name='fc2'),
+    tf.keras.layers.Dense(len(class_labels), activation='softmax', name='predictions')
 ])
+
+# model_input = tf.keras.Input(shape=(224,224,3),dtype='float32',name='input_1')
+model.load_weights('/home/maanvi/LAB/pre_trained_models/imgnet_test/cp.ckpt').expect_partial()
 print(model.summary())
-model.compile(optimizer=tf.keras.optimizers.Adam(),
-              loss=tf.keras.losses.CategoricalCrossentropy(),
-              metrics=['accuracy'])
+model.layers.pop()
+print(model.summary())
+#base_model = tf.keras.models.Model(inputs=model.input,outputs=model.layers[-5].output)
+#print(base_model.summary())
+# tf.keras.utils.plot_model(base_model, to_file='/home/maanvi/LAB/tmp.png', show_shapes=True, show_dtype=True)
+#global_average_layer = tf.keras.layers.GlobalAveragePooling2D()
+#prediction_layer = tf.keras.layers.Dense(len(class_labels),activation='softmax')
+# model = tf.keras.Sequential([
+#   vgg16_pretrained_model,
+#   tf.keras.layers.Flatten(name='flatten'),
+#   tf.keras.layers.Dense(256, activation='relu', name='fc1'),
+#   tf.keras.layers.Dense(128, activation='relu', name='fc2'),
+#   tf.keras.layers.Dense(len(class_labels), activation='sigmoid', name='predictions')
+# ])
+# model.compile(optimizer=tf.keras.optimizers.Adam(),
+#               loss=tf.keras.losses.CategoricalCrossentropy(),
+#               metrics=['accuracy'])
 
 
 
-checkpoint_dir = os.path.dirname(checkpoint_path)
+# checkpoint_dir = os.path.dirname(checkpoint_path)
 
-#Create a callback that saves the model weights
-cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,
-                                                 save_weights_only=True,
-                                                 verbose=1)
+# #Create a callback that saves the model weights
+# cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,
+#                                                  save_weights_only=True,
+#                                                  verbose=1)
 
-model.fit(train_dataset, 
-          validation_data=val_dataset,
-          epochs=100,
-          callbacks=[cp_callback])
+# model.fit(train_dataset, 
+#           validation_data=val_dataset,
+#           epochs=100,
+#           callbacks=[cp_callback])
 
 # vgg_model = tf.keras.applications.VGG16(input_shape=(224, 224, 3))
 # for layer in model.layers:

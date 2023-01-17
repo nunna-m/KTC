@@ -156,19 +156,29 @@ class vgg16_pretrained_medmnist(Model):
         **kwargs,
     ):
         super().__init__(**kwargs)
-        self.base_model = tf.keras.applications.VGG16(input_shape=(224, 224, 3),include_top=False)
-        self.base_model.load_weights(checkpoint_path)
+        self.vgg_medmnist_model = tf.keras.Sequential([
+                tf.keras.applications.VGG16(input_shape=(224,224,3),include_top=False),
+                tf.keras.layers.Flatten(name='flatten'),
+                tf.keras.layers.Dense(256, activation='relu', name='fc1'),
+                tf.keras.layers.Dense(128, activation='relu', name='fc2'),
+                tf.keras.layers.Dense(11, activation='softmax', name='predictions')
+                ])
+        self.vgg_medmnist_model.load_weights(checkpoint_path).expect_partial()
+        # # self.vgg_medmnist_model_last_layer = self.vgg_medmnist_model.get_layer('vgg16').output
+        # self.base_model = tf.keras.models.Model(inputs=self.vgg_medmnist_model.input,outputs=self.vgg_medmnist_model.layers[-5].output)
+        self.base_model = keras.Sequential()
+        for layer in self.vgg_medmnist_model.layers:
+            if layer.name == 'flatten':
+                break
+            self.base_model.add(layer)
         for self.layer in self.base_model.layers:
             self.layer.trainable = False
-        
-        self.last_layer = self.base_model.get_layer('block5_pool')
-        self.top_model = self.last_layer.output
         self.gap = layers.GlobalAveragePooling2D()
         self.dense1 = layers.Dense(512, activation=activation)
         self.dropout = layers.Dropout(0.2)
         self.dense2 = layers.Dense(256, activation=activation)
         self.dense3 = layers.Dense(classifier_neurons, activation=classifier_activation)
-        
+        self.input_layer = layers.InputLayer(input_shape=(224,224,3))
     
     @tf.function
     def call(self, input_tensor, training=False):
