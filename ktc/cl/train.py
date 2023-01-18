@@ -127,7 +127,7 @@ def train(
             callbacks = [TqdmCallback(verbose=2)],
             verbose=0,
         )
-        model.save_weights(weights_filename)
+        #model.save_weights(weights_filename)
     
         x_test_numpy = []
         y_test_numpy = []
