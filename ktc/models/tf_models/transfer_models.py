@@ -215,10 +215,10 @@ class vgg16_pretrained_medmnist_lblck(Model):
             if layer.name == 'flatten':
                 break
             self.base_model.add(layer)
-        for self.layer in self.base_model.layers[:15]:
-            self.layer.trainable = False
-        for self.layer in self.base_model.layers[15:]:
-            self.layer.trainable = True
+        for self.layer in self.base_model.layers:
+            if "Functional" == self.layer.__class__.__name__:
+                for self._layer in self.layer.layers[:15]:
+                    self._layer.trainable=False
         self.gap = layers.GlobalAveragePooling2D()
         self.dense1 = layers.Dense(512, activation=activation)
         self.dropout = layers.Dropout(0.2)

@@ -112,9 +112,15 @@ model = tf.keras.Sequential([
 
 # model_input = tf.keras.Input(shape=(224,224,3),dtype='float32',name='input_1')
 model.load_weights('/home/maanvi/LAB/pre_trained_models/imgnet_test/cp.ckpt').expect_partial()
-print(model.summary())
-model.layers.pop()
-print(model.summary())
+#print(model.summary())
+for layer in model.layers:
+    if "Functional" == layer.__class__.__name__:
+        for _layer in layer.layers[:15]:
+            _layer.trainable=False
+for layer in model.layers:
+    if "Functional" == layer.__class__.__name__:
+        for _layer in layer.layers:
+            print(_layer.name,_layer.trainable)
 #base_model = tf.keras.models.Model(inputs=model.input,outputs=model.layers[-5].output)
 #print(base_model.summary())
 # tf.keras.utils.plot_model(base_model, to_file='/home/maanvi/LAB/tmp.png', show_shapes=True, show_dtype=True)
