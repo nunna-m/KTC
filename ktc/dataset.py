@@ -866,7 +866,7 @@ def get_tumor_boundingbox(imgpath, labelpath):
 
     #gaussian standardizes only modality am
     tmp = imgpath.rsplit(os.path.sep,2)[1]
-    if tmp=='dc':
+    if tmp=='ec':
         mean, std = orig_image.mean(), orig_image.std()
         orig_image = (orig_image - mean)/std
         mean, std = orig_image.mean(), orig_image.std()
