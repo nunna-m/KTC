@@ -866,7 +866,7 @@ def get_tumor_boundingbox(imgpath, labelpath):
 
     #gaussian standardizes only modality am
     tmp = imgpath.rsplit(os.path.sep,2)[1]
-    if tmp=='am':
+    if tmp=='dc':
         mean, std = orig_image.mean(), orig_image.std()
         orig_image = (orig_image - mean)/std
         mean, std = orig_image.mean(), orig_image.std()
@@ -875,7 +875,7 @@ def get_tumor_boundingbox(imgpath, labelpath):
         orig_image *= 255
     backup = orig_image[y1:y2,x1:x2]
     backup = cv2.resize(backup, (224,224),interpolation = cv2.INTER_LINEAR)
-    cv2.imwrite('/home/maanvi/registered_resize.png',backup)
+    #cv2.imwrite('/home/maanvi/registered_resize.png',backup)
     backup = tf.convert_to_tensor(backup, dtype=tf.uint8)
     return backup
 
