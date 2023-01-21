@@ -799,7 +799,7 @@ def get_exact_tumor(imgpath, labelpath):
     backup = image.copy()
     #gaussian standardizes only modality am
     tmp = imgpath.rsplit(os.path.sep,2)[1]
-    if tmp=='none':
+    if tmp=='am' or tmp=='dc' or tmp=='ec' or tmp=='pc' or tmp=='tm':
         mean, std = orig_image.mean(), orig_image.std()
         orig_image = (orig_image - mean)/std
         mean, std = orig_image.mean(), orig_image.std()
