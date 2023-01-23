@@ -447,7 +447,8 @@ class res_net50(Model):
     def __init__(
         self,
         activation='relu',
-        classifier_neurons=1,
+        classifier_neurons=2,
+        classifier_activation='softmax',
         **kargs,
     ):
         super().__init__(**kargs)
@@ -462,7 +463,7 @@ class res_net50(Model):
         self.dense1 = layers.Dense(512, activation=activation)
         self.dropout = layers.Dropout(0.2)
         self.dense2 = layers.Dense(256, activation=activation)
-        self.dense3 = layers.Dense(classifier_neurons, activation='sigmoid')
+        self.dense3 = layers.Dense(classifier_neurons, activation=classifier_activation)
         
     
     @tf.function
