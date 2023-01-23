@@ -799,13 +799,13 @@ def get_exact_tumor(imgpath, labelpath):
     backup = image.copy()
     #gaussian standardizes only modality am
     tmp = imgpath.rsplit(os.path.sep,2)[1]
-    # if tmp=='am' or tmp=='dc' or tmp=='ec' or tmp=='pc' or tmp=='tm':
-    #     mean, std = orig_image.mean(), orig_image.std()
-    #     orig_image = (orig_image - mean)/std
-    #     mean, std = orig_image.mean(), orig_image.std()
-    #     orig_image = np.clip(orig_image, -1.0, 1.0)
-    #     orig_image = (orig_image + 1.0) / 2.0
-    #     orig_image *= 255
+    if tmp=='am':
+        mean, std = orig_image.mean(), orig_image.std()
+        orig_image = (orig_image - mean)/std
+        mean, std = orig_image.mean(), orig_image.std()
+        orig_image = np.clip(orig_image, -1.0, 1.0)
+        orig_image = (orig_image + 1.0) / 2.0
+        orig_image *= 255
     lower_red = np.array([0,0,50])
     upper_red = np.array([0,0,255])
     mask = cv2.inRange(image, lower_red, upper_red)
