@@ -82,7 +82,8 @@ class alex_net(Model):
         padding='same',
         activation='relu',
         dropout=0.5,
-        classifier_neurons=1,
+        classifier_neurons=2,
+        classifier_activation='softmax',
         **kargs,
     ):
         super().__init__(**kargs)
@@ -112,7 +113,7 @@ class alex_net(Model):
         self.dense2 = layers.Dense(4096, activation=activation)
         self.dropout2 = layers.Dropout(rate=dropout)
         
-        self.dense3 = layers.Dense(classifier_neurons, activation='sigmoid')
+        self.dense3 = layers.Dense(classifier_neurons, activation=classifier_activation)
     
     @tf.function
     def call(self, input_tensor, training=False):
