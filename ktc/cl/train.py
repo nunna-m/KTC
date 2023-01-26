@@ -208,6 +208,7 @@ def train(
         colnames.insert(0,'File')
         eval_metrics['File'] = metrics_file_name
         newPath = os.path.join(config['data_options'][whichos]['save_path'],metrics_file_name,'metrics.csv')
+        outerPath = os.path.join(config['data_options'][whichos]['save_path'],'metrics.csv')
         if not os.path.exists(newPath):
             df = pd.DataFrame(columns=colnames)
             df = df.append(eval_metrics,ignore_index=True)
@@ -215,6 +216,8 @@ def train(
         else:
             extra = pd.DataFrame([eval_metrics],columns=colnames)
             extra.to_csv(newPath, mode='a', header=False)
+            another_extra = pd.DataFrame([eval_metrics],columns=colnames)
+            another_extra.to_csv(outerPath, mode='a', header=False)
         del model
         del results
     
