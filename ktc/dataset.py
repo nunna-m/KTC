@@ -505,7 +505,7 @@ def tf_combine_modalities_registered(subject_path, output_size, modalities, tumo
             modalities=modalities,
             tumor_region_only=tumor_region_only)(x)['slices'],
             [subject_path],
-            tf.uint8,
+            tf.float32,
         )
     elif return_type == 'dataset':
         return tf.data.Dataset.from_tensor_slices(
@@ -789,7 +789,7 @@ def get_tumor_boundingbox_registered(imgpath, labelpath):
     # #cv2.imwrite(f'/home/maanvi/registered_resize{imgpath[-5]}.png',backup)
     new_path = imgpath.replace('kt_registered','kt_registered_box')
     backup = cv2.imread(new_path)[:,:,0]
-    backup = tf.convert_to_tensor(backup, dtype=tf.uint8)
+    backup = tf.convert_to_tensor(backup, dtype=tf.float32)
     #print(backup.shape)
     return backup
 def get_exact_tumor(imgpath, labelpath):
