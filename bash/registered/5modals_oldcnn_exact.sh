@@ -1,0 +1,1 @@
+python3 -m ktc train_registered --whichos remote --modalities am dc ec pc tm --method both --network oldcnn --config "configfiles/extra/data_options_registered.yaml" --max_steps 50 --filename mpCNN_5ch_exactTumor_reg
