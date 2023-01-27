@@ -505,7 +505,7 @@ def tf_combine_modalities_registered(subject_path, output_size, modalities, tumo
             modalities=modalities,
             tumor_region_only=tumor_region_only)(x)['slices'],
             [subject_path],
-            tf.uint8,
+            tf.float32,
         )
     elif return_type == 'dataset':
         return tf.data.Dataset.from_tensor_slices(
@@ -565,12 +565,15 @@ def combine_modalities_registered(subject, output_size, modalities, tumor_region
     assert len(modalities) > 1
     images = []
     for name in slice_names:
-        diff = 3
+        if len(modalities)<=3:
+            diff = 3
+        else:
+            diff = 5
         img = tf.expand_dims(subject_data['registered_images'][name], axis=-1)
         final_image = tf.repeat(img, repeats=[diff],axis=-1)
         images.append(final_image)
     slices = tf.stack(images, axis=0)
-    #print(f"Slice.shape: {slices.shape}")
+    #print(slices.shape)
     return dict(
         slices=slices,
         subject_path=subject_data['subject_path'],
@@ -673,6 +676,7 @@ def parse_subject_registered(subject_path,
     
     subject_data['clas'], subject_data['ID'] = get_class_ID_subjectpath(subject_path)
     sliceNames = os.listdir(registered_subject_path)
+    #print(f'Len of slicenames: {len(sliceNames)}')
     subject_data['num_slices_per_modality']=len(sliceNames)
 
     subject_data['registered_images'] = dict()
@@ -683,7 +687,7 @@ def parse_subject_registered(subject_path,
         for name in sliceNames:
             subject_data['registered_images'][name] = get_tumor_boundingbox_registered(os.path.join(registered_subject_path,name),os.path.join(registered_subject_path_label,name))
 
-    #print(f"Subject data shape: {subject_data['registered_images']['1.png'].shape}")
+    #print(f"Subject data shape: {subject_data['registered_images'][sliceNames[0]].shape}")
     return subject_data
 
 def get_class_ID_subjectpath(subject):
@@ -785,7 +789,7 @@ def get_tumor_boundingbox_registered(imgpath, labelpath):
     # #cv2.imwrite(f'/home/maanvi/registered_resize{imgpath[-5]}.png',backup)
     new_path = imgpath.replace('kt_registered','kt_registered_box')
     backup = cv2.imread(new_path)[:,:,0]
-    backup = tf.convert_to_tensor(backup, dtype=tf.uint8)
+    backup = tf.convert_to_tensor(backup, dtype=tf.float32)
     #print(backup.shape)
     return backup
 def get_exact_tumor(imgpath, labelpath):
