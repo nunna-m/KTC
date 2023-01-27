@@ -735,7 +735,7 @@ def get_exact_tumor_registered(imgpath, labelpath):
     #cv2.imwrite(f'/home/maanvi/registered_resize_exact{imgpath[-5]}.png',out)
     new_path = imgpath.replace('kt_registered','kt_registered_exact')
     out = cv2.imread(new_path)[:,:,0]
-    out = tf.convert_to_tensor(out, dtype=tf.uint8)
+    out = tf.convert_to_tensor(out, dtype=tf.float32)
     return out
 
 def get_tumor_boundingbox_registered(imgpath, labelpath):
@@ -789,7 +789,7 @@ def get_tumor_boundingbox_registered(imgpath, labelpath):
     # #cv2.imwrite(f'/home/maanvi/registered_resize{imgpath[-5]}.png',backup)
     new_path = imgpath.replace('kt_registered','kt_registered_box')
     backup = cv2.imread(new_path)[:,:,0]
-    backup = tf.convert_to_tensor(backup, dtype=tf.float32)
+    backup = tf.convert_to_tensor(backup, dtype=tf.uint8)
     #print(backup.shape)
     return backup
 def get_exact_tumor(imgpath, labelpath):
