@@ -1,5 +1,4 @@
 tensorflow==2.4.0
-git+https://github.com/yoshihikoueno/dsargparse.git@master
 numpy==1.19.2
 connected-components-3d
 tensorflow-addons
@@ -8,8 +7,8 @@ protobuf
 regex
 pandas
 tqdm
-simpleitk
-opencv-python==4.5.1.48
+opencv-python
+git+https://github.com/yoshihikoueno/dsargparse.git@master
 p_tqdm
 pyyaml
 tensorboard_plugin_profile
