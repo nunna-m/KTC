@@ -1,0 +1,3 @@
+python3 -m ktc train --whichos remote --modalities pc --method both --network vgg16_lastblocktrain --config "configfiles/extra/data_options.yaml" --max_steps 50 --filename v16-lblck-exact-pc-new
+python3 -m ktc train --whichos remote --modalities ec pc --method both --network vgg16_lastblocktrain --config "configfiles/extra/data_options.yaml" --max_steps 50 --filename v16-lblck-exact-pc-new
+python3 -m ktc train --whichos remote --modalities dc pc --method both --network vgg16_lastblocktrain --config "configfiles/extra/data_options.yaml" --max_steps 50 --filename v16-lblck-exact-pc-new
